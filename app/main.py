@@ -3,12 +3,14 @@ from pydantic import BaseModel
 import re
 import os
 import openai
+from dotenv import load_dotenv
+from mail import enviar_email
 
+load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
-# Estado da conversa e dados coletados
 data = {
     "nome": None,
     "empresa": None,
@@ -19,7 +21,6 @@ data = {
     "finalizado": False
 }
 
-# Perguntas de diagnóstico
 perguntas = [
     "Qual o site da empresa?",
     "Quais os segmentos a empresa atende?",
@@ -80,6 +81,10 @@ async def chat(req: Request):
             prompt = gerar_prompt(data)
             resposta = chamar_llm(prompt)
             data["finalizado"] = True
+
+            # Envia por e-mail
+            enviar_email(data, resposta)
+
             return {
                 "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
                 "resumo": resposta
