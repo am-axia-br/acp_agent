@@ -1,21 +1,26 @@
 from fastapi import FastAPI, Request
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 import re
+import os
+import openai
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
-# Armazena o estado da conversa e os dados
-respostas = {
+# Estado da conversa e dados coletados
+data = {
     "nome": None,
     "empresa": None,
     "whatsapp": None,
     "email": None,
     "diagnostico": [],
-    "etapa_atual": 0
+    "etapa_atual": 0,
+    "finalizado": False
 }
 
-# Lista de perguntas do diagnóstico
-perguntas_diagnostico = [
+# Perguntas de diagnóstico
+perguntas = [
     "Qual o site da empresa?",
     "Quais os segmentos a empresa atende?",
     "Quais as características dos clientes da empresa?",
@@ -44,54 +49,73 @@ def home():
 @app.post("/chat")
 async def chat(req: Request):
     body = await req.json()
-    mensagem = body.get("mensagem", "").strip()
+    msg = body.get("mensagem", "").strip()
 
-    # Coleta nome
-    if not respostas["nome"]:
-        respostas["nome"] = mensagem
+    if not data["nome"]:
+        data["nome"] = msg
         return {"pergunta": "Qual o nome da sua empresa?"}
 
-    # Coleta empresa
-    if not respostas["empresa"]:
-        respostas["empresa"] = mensagem
+    if not data["empresa"]:
+        data["empresa"] = msg
         return {"pergunta": "Qual o seu WhatsApp? (Ex: 11 9 1234-5678)"}
 
-    # Valida WhatsApp
-    if not respostas["whatsapp"]:
-        if re.match(r"^\d{2}\s9\s\d{4}-\d{4}$", mensagem):
-            respostas["whatsapp"] = mensagem
+    if not data["whatsapp"]:
+        if re.match(r"^\d{2}\s9\s\d{4}-\d{4}$", msg):
+            data["whatsapp"] = msg
             return {"pergunta": "Qual o seu e-mail?"}
-        else:
-            return {"pergunta": "Formato de WhatsApp inválido. Exemplo: 11 9 1234-5678"}
+        return {"pergunta": "Formato inválido. Exemplo: 11 9 1234-5678"}
 
-    # Valida e-mail
-    if not respostas["email"]:
-        if re.match(r"^[\w\.-]+@[\w\.-]+\.\w{2,4}$", mensagem):
-            respostas["email"] = mensagem
-            return {"mensagem": "Obrigado pelas informações! Agora vamos entender melhor a situação atual da sua empresa.", "pergunta": perguntas_diagnostico[0]}
-        else:
-            return {"pergunta": "E-mail inválido. Por favor, envie um e-mail válido."}
+    if not data["email"]:
+        if re.match(r"^[\w\.-]+@[\w\.-]+\.\w{2,4}$", msg):
+            data["email"] = msg
+            return {"mensagem": "Obrigado! Agora vamos entender melhor sua empresa.", "pergunta": perguntas[0]}
+        return {"pergunta": "E-mail inválido. Envie um formato válido."}
 
-    # Diagnóstico: perguntas 1 a 16
-    if respostas["etapa_atual"] < len(perguntas_diagnostico):
-        respostas["diagnostico"].append(mensagem)
-        respostas["etapa_atual"] += 1
-        if respostas["etapa_atual"] < len(perguntas_diagnostico):
-            return {"pergunta": perguntas_diagnostico[respostas["etapa_atual"]]}
+    if data["etapa_atual"] < len(perguntas):
+        data["diagnostico"].append(msg)
+        data["etapa_atual"] += 1
+        if data["etapa_atual"] < len(perguntas):
+            return {"pergunta": perguntas[data["etapa_atual"]]}
         else:
+            prompt = gerar_prompt(data)
+            resposta = chamar_llm(prompt)
+            data["finalizado"] = True
             return {
-                "mensagem": "Diagnóstico finalizado! Com base nas suas respostas, irei gerar uma sugestão de estratégia de canais:",
-                "resumo": {
-                    "nome": respostas["nome"],
-                    "empresa": respostas["empresa"],
-                    "whatsapp": respostas["whatsapp"],
-                    "email": respostas["email"],
-                    "respostas": respostas["diagnostico"]
-                },
-                "proximos_passos": [
-                    "Modelos de canais ideais",
-                    "Perfis de parceiros recomendados",
-                    "Top 20 cidades para expansão",
-                    "Projeção de faturamento com 20 canais"
-                ]
+                "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
+                "resumo": resposta
             }
+
+    return {"mensagem": "Diagnóstico já concluído."}
+
+def gerar_prompt(data):
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+    return f"""
+Você é um especialista em canais de vendas no Brasil.
+Com base nas respostas abaixo, forneça:
+- Melhores modelos de canais
+- Perfis ideais de parceiros
+- As 20 melhores cidades e regiões para canais
+- Projeção de faturamento com 20 canais ativos
+
+Informações:
+Nome: {data['nome']}
+Empresa: {data['empresa']}
+WhatsApp: {data['whatsapp']}
+E-mail: {data['email']}
+
+Respostas:
+{blocos}
+"""
+
+def chamar_llm(prompt):
+    try:
+        resposta = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return resposta.choices[0].message.content
+    except Exception as e:
+        return f"Erro ao gerar sugestão: {str(e)}"
