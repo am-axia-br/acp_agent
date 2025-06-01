@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
-from app.memory import perfil_prospect
-from app.prompts import perguntas_estrategicas
+from memory import perfil_prospect
+from prompts import perguntas_estrategicas
 
 app = FastAPI()
 
