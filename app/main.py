@@ -40,21 +40,13 @@ data = {
 
 perguntas = [
     "Qual o site da empresa?",
-    "Quais os segmentos a empresa atende?",
-    "Quais as características dos clientes da empresa?",
+    "Quais segmentos a empresa atende?",
     "Poderia citar 3 clientes atuais?",
-    "Quais as dores e os benefícios são levados aos clientes?",
+    "Quais dores a sua empresa resolve e quais benefícios são levados aos clientes?",
     "Quais os seus diferenciais?",
     "Quais os produtos e serviços vendidos?",
-    "Como é o processo comercial atual?",
     "Qual o modelo de negócio da empresa? Comercializa licenças? Cobra mensalidade? Cobra projeto?",
-    "Qual o ticket médio das mensalidades?",
-    "Qual o ticket médio dos projetos?",
-    "Você possui indicadores comerciais? Quais?",
-    "Como é o seu processo comercial atual?",
-    "Você tem experiência com canais de vendas? Me fale desta experiência!",
-    "Você tem uma proposta de valor já desenvolvida?",
-    "Você tem uma meta mensal de vendas? Quais são estas metas?"
+    "Qual o ticket médio dos negócios?"
 ]
 
 @app.post("/chat")
@@ -93,28 +85,36 @@ async def chat(req: Request):
             return {"pergunta": perguntas[data["etapa_atual"]]}
         else:
             prompt = gerar_prompt(data)
-            resposta = chamar_llm(prompt)
-            data["finalizado"] = True
-            enviar_email(data, resposta)
-            return {
-                "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
-                "resumo": resposta,
-                "email": data["email"]
-            }
+            try:
+                resposta = chamar_llm(prompt)
+                data["finalizado"] = True
+                enviar_email(data, resposta)
+                return {
+                    "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
+                    "resumo": resposta,
+                    "email": data["email"]
+                }
+            except Exception as e:
+                return {
+                    "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
+                    "resumo": f"Erro ao gerar sugestão: {str(e)}",
+                    "email": data["email"]
+                }
 
     return {"mensagem": "Diagnóstico já concluído."}
 
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
     return f"""
-Você é um especialista em canais de vendas no Brasil.
-Com base nas respostas abaixo, forneça:
-- Melhores modelos de canais
-- Perfis ideais de parceiros
-- As 20 melhores cidades e regiões para canais
-- Projeção de faturamento com 20 canais ativos
+Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça:
 
-Informações:
+- Sugestões de modelos ideais de canais de vendas para esse tipo de empresa
+- Perfis ideais de parceiros
+- As 20 melhores cidades e regiões para buscar parceiros comerciais
+- Projeção de faturamento com 20 canais ativos
+- Quais tipos de apoio e recursos essa empresa pode oferecer aos parceiros
+
+Dados do diagnóstico:
 Nome: {data['nome']}
 Empresa: {data['empresa']}
 WhatsApp: {data['whatsapp']}
@@ -125,14 +125,11 @@ Respostas:
 """
 
 def chamar_llm(prompt):
-    try:
-        resposta = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return resposta.choices[0].message.content
-    except Exception as e:
-        return f"Erro ao gerar sugestão: {str(e)}"
+    resposta = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return resposta.choices[0].message.content

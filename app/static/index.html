@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -8,23 +8,26 @@
     body {
       font-family: 'Inter', sans-serif;
       background: linear-gradient(to bottom, #fdfbfb, #ebedee);
-      padding: 40px;
+      padding: 0;
       margin: 0;
       color: #333;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
     }
     .logo {
       display: block;
-      margin: 0 auto;
+      margin: 20px auto 10px;
       max-width: 250px;
     }
     h2 {
       text-align: center;
       color: #7b2cbf;
-      margin-top: 10px;
+      margin: 10px 0;
     }
     #chat-form {
       text-align: center;
-      margin-bottom: 20px;
+      margin: 10px 0;
     }
     #mensagem {
       width: 60%;
@@ -45,17 +48,22 @@
     }
     #resetar {
       background: #7b2cbf;
-      margin-top: 10px;
+      margin: 10px auto;
+      display: block;
     }
-    #mensagens, #resposta {
+    #mensagens {
+      flex: 1;
       max-width: 800px;
-      margin: 20px auto;
+      margin: 0 auto;
       background: white;
       padding: 20px;
       border: 1px solid #ddd;
       border-radius: 10px;
+      overflow-y: scroll;
       white-space: pre-wrap;
-      overflow-y: auto;
+    }
+    #resposta {
+      display: none;
     }
     .mensagem { margin: 10px 0; }
     .usuario { font-weight: bold; color: #5e17eb; }
@@ -71,7 +79,7 @@
     }
     footer {
       text-align: center;
-      margin-top: 50px;
+      padding: 10px;
       font-size: 14px;
       color: #666;
     }
@@ -118,8 +126,6 @@
       divUser.textContent = "Você: " + mensagem;
       mensagens.appendChild(divUser);
 
-      mensagens.scrollTop = mensagens.scrollHeight;
-
       try {
         const response = await fetch("/chat", {
           method: "POST",
@@ -165,3 +171,4 @@
   </script>
 </body>
 </html>
+
