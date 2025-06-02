@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -128,7 +128,7 @@
   <h2>Converse com o Agente ACP</h2>
 
   <form id="chat-form">
-    <input type="text" id="mensagem" placeholder="Digite aqui" required>
+    <input type="text" id="mensagem" placeholder="Digite aqui (Ex: DDD9XXXXYYYY)" required>
     <button type="submit">Enviar</button>
   </form>
 
@@ -206,7 +206,7 @@
           clearInterval(intervalo);
           carregando.style.display = 'none';
           finalizacao.style.display = 'block';
-          resumoDiagnostico.textContent = finalData.resumo;
+          resumoDiagnostico.innerHTML = finalData.resumo;
           emailFinal.textContent = finalData?.email || 'seu e-mail';
           return;
         }
@@ -244,7 +244,3 @@
   </script>
 </body>
 </html>
-
-
-
-

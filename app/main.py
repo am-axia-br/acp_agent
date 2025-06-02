@@ -58,7 +58,7 @@ async def chat(req: Request):
 
     if not data["iniciado"]:
         data["iniciado"] = True
-        return {"mensagem": "Olá! Sou o Agente ACP, especialista em canais de vendas. Para começarmos, qual o seu nome?"}
+        return {"mensagem": "Olá... Eu sou uma IA especialista em canais de vendas e o meu objetivo é te apresentar uma estratégia para você escalar suas vendas através de alianças, parcerias e canais de vendas... Vou te fazer algumas perguntas de forma que eu tenha as informações necessárias para gerar um diagnóstico completo e todas as ações que você deverá tomar. Para começarmos, me fale o seu nome..."}
 
     if not data["nome"]:
         data["nome"] = msg
@@ -66,13 +66,13 @@ async def chat(req: Request):
 
     if not data["empresa"]:
         data["empresa"] = msg
-        return {"pergunta": "Qual o seu WhatsApp? (Ex: 11 9 1234-5678)"}
+        return {"pergunta": "Qual o seu WhatsApp? (Ex: DDD9XXXXYYYY)"}
 
     if not data["whatsapp"]:
-        if re.match(r"^\d{2}\s9\s\d{4}-\d{4}$", msg):
+        if re.match(r"^\d{11}$", msg):
             data["whatsapp"] = msg
             return {"pergunta": "Qual o seu e-mail?"}
-        return {"pergunta": "Formato inválido. Exemplo: 11 9 1234-5678"}
+        return {"pergunta": "Formato inválido. Exemplo: DDD9XXXXYYYY"}
 
     if not data["email"]:
         if re.match(r"^[\w\.-]+@[\w\.-]+\.\w{2,4}$", msg):
@@ -152,7 +152,3 @@ def chamar_llm(prompt):
     linhas = texto.replace('. ', '.\n')
     enviar_email(data, linhas)
     return linhas
-
-
-
-
