@@ -59,8 +59,9 @@
       padding: 20px;
       border: 1px solid #ddd;
       border-radius: 10px;
-      overflow-y: scroll;
+      overflow-y: auto;
       white-space: pre-wrap;
+      min-height: 300px;
     }
     #resposta {
       display: none;
@@ -76,6 +77,7 @@
       border: 1px solid #ffeeba;
       border-radius: 10px;
       display: none;
+      white-space: pre-wrap;
     }
     #carregando {
       display: none;
@@ -94,8 +96,8 @@
     #barra {
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, #a638ec, #fc6736);
-      transition: width 1s ease-in-out;
+      background: linear-gradient(90deg, #7b2cbf, #fc6736);
+      transition: width 1s linear;
     }
     footer {
       text-align: center;
@@ -144,6 +146,9 @@
     const carregando = document.getElementById("carregando");
     const barra = document.getElementById("barra");
 
+    let progresso = 0;
+    let intervalo;
+
     document.getElementById("chat-form").addEventListener("submit", async function(e) {
       e.preventDefault();
       const mensagem = document.getElementById("mensagem").value;
@@ -166,16 +171,18 @@
           document.getElementById("chat-form").style.display = 'none';
           mensagens.style.display = 'none';
           carregando.style.display = 'block';
-          let pct = 0;
-          const interval = setInterval(() => {
-            pct += 10;
-            barra.style.width = pct + '%';
-            if (pct >= 100) clearInterval(interval);
-          }, 500);
+          progresso = 0;
+          barra.style.width = '0%';
+          intervalo = setInterval(() => {
+            progresso += 0.3;
+            barra.style.width = progresso + '%';
+            if (progresso >= 100) clearInterval(intervalo);
+          }, 100);
           return;
         }
 
         if (data.resumo) {
+          clearInterval(intervalo);
           carregando.style.display = 'none';
           finalizacao.style.display = 'block';
           resumoDiagnostico.textContent = data.resumo;

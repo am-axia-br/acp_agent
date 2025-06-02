@@ -87,18 +87,24 @@ async def chat(req: Request):
         else:
             try:
                 prompt = gerar_prompt(data)
-                return {"mensagem": "Analisando as respostas e desenvolvendo um projeto para sua empresa...", "loading": True}
+                resposta = chamar_llm(prompt)
+                data["finalizado"] = True
+                return {
+                    "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
+                    "resumo": resposta,
+                    "email": data["email"]
+                }
             except Exception as e:
                 return {
-                    "mensagem": "Ocorreu um erro ao preparar o diagnóstico.",
-                    "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
+                    "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
+                    "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
                     "email": data["email"]
                 }
 
     return {"mensagem": "Diagnóstico já concluído."}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).strip()
     return f"""
 Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça:
 
@@ -126,9 +132,10 @@ def chamar_llm(prompt):
             {"role": "user", "content": prompt}
         ]
     )
-    texto = resposta.choices[0].message.content
+    texto = resposta.choices[0].message.content.strip()
     linhas = texto.replace('. ', '.\n')
     enviar_email(data, linhas)
     return linhas
+
 
 
