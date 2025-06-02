@@ -4,14 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import re
 import os
+import openai
 import traceback
 from dotenv import load_dotenv
 from mail import enviar_email
-from openai import OpenAI  # ✅ Novo cliente recomendado pela OpenAI
+from openai import OpenAI
 
 load_dotenv()
-
-# ✅ Instanciando o novo cliente com API key
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
@@ -86,20 +85,13 @@ async def chat(req: Request):
         if data["etapa_atual"] < len(perguntas):
             return {"pergunta": perguntas[data["etapa_atual"]]}
         else:
-            prompt = gerar_prompt(data)
             try:
-                resposta = chamar_llm(prompt)
-                data["finalizado"] = True
-                enviar_email(data, resposta)
-                return {
-                    "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
-                    "resumo": resposta,
-                    "email": data["email"]
-                }
+                prompt = gerar_prompt(data)
+                return {"mensagem": "Analisando as respostas e desenvolvendo um projeto para sua empresa...", "loading": True}
             except Exception as e:
                 return {
-                    "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
-                    "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
+                    "mensagem": "Ocorreu um erro ao preparar o diagnóstico.",
+                    "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
                     "email": data["email"]
                 }
 
@@ -126,7 +118,6 @@ Respostas:
 {blocos}
 """
 
-# ✅ NOVA FORMA de chamada para OpenAI >= 1.0.0
 def chamar_llm(prompt):
     resposta = client.chat.completions.create(
         model="gpt-4o",
@@ -135,4 +126,9 @@ def chamar_llm(prompt):
             {"role": "user", "content": prompt}
         ]
     )
-    return resposta.choices[0].message.content
+    texto = resposta.choices[0].message.content
+    linhas = texto.replace('. ', '.\n')
+    enviar_email(data, linhas)
+    return linhas
+
+

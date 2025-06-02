@@ -77,6 +77,26 @@
       border-radius: 10px;
       display: none;
     }
+    #carregando {
+      display: none;
+      text-align: center;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+    #barra-progresso {
+      width: 80%;
+      height: 12px;
+      margin: 10px auto;
+      background: #ddd;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    #barra {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #a638ec, #fc6736);
+      transition: width 1s ease-in-out;
+    }
     footer {
       text-align: center;
       padding: 10px;
@@ -99,6 +119,11 @@
   <div id="mensagens"></div>
   <pre id="resposta"></pre>
 
+  <div id="carregando">
+    <p>Analisando as respostas e desenvolvendo um projeto para sua empresa...</p>
+    <div id="barra-progresso"><div id="barra"></div></div>
+  </div>
+
   <div id="finalizacao">
     <h3>Resumo do Diagnóstico</h3>
     <div id="resumoDiagnostico"></div>
@@ -116,6 +141,8 @@
     const finalizacao = document.getElementById("finalizacao");
     const resumoDiagnostico = document.getElementById("resumoDiagnostico");
     const emailFinal = document.getElementById("emailFinal");
+    const carregando = document.getElementById("carregando");
+    const barra = document.getElementById("barra");
 
     document.getElementById("chat-form").addEventListener("submit", async function(e) {
       e.preventDefault();
@@ -135,19 +162,31 @@
 
         const data = await response.json();
 
-        const divIa = document.createElement("div");
-        divIa.className = "mensagem ia";
-        divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
-        mensagens.appendChild(divIa);
-
-        mensagens.scrollTop = mensagens.scrollHeight;
+        if (data.loading) {
+          document.getElementById("chat-form").style.display = 'none';
+          mensagens.style.display = 'none';
+          carregando.style.display = 'block';
+          let pct = 0;
+          const interval = setInterval(() => {
+            pct += 10;
+            barra.style.width = pct + '%';
+            if (pct >= 100) clearInterval(interval);
+          }, 500);
+          return;
+        }
 
         if (data.resumo) {
-          respostaArea.style.display = 'none';
+          carregando.style.display = 'none';
           finalizacao.style.display = 'block';
           resumoDiagnostico.textContent = data.resumo;
           emailFinal.textContent = data?.email || 'seu e-mail';
         }
+
+        const divIa = document.createElement("div");
+        divIa.className = "mensagem ia";
+        divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
+        mensagens.appendChild(divIa);
+        mensagens.scrollTop = mensagens.scrollHeight;
 
         respostaArea.textContent = JSON.stringify(data, null, 2);
       } catch (error) {
@@ -162,6 +201,10 @@
       mensagens.innerHTML = "";
       respostaArea.textContent = "";
       finalizacao.style.display = 'none';
+      carregando.style.display = 'none';
+      document.getElementById("chat-form").style.display = 'block';
+      mensagens.style.display = 'block';
+      barra.style.width = '0%';
       alert("Diagnóstico reiniciado localmente. Recarregue a página para reiniciar no servidor.");
     }
 
