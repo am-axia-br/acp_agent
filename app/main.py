@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import re
 import os
 import openai
+import traceback
 from dotenv import load_dotenv
 from mail import enviar_email
 
@@ -97,7 +98,7 @@ async def chat(req: Request):
             except Exception as e:
                 return {
                     "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
-                    "resumo": f"Erro ao gerar sugestão: {str(e)}",
+                    "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
                     "email": data["email"]
                 }
 
@@ -133,3 +134,4 @@ def chamar_llm(prompt):
         ]
     )
     return resposta.choices[0].message.content
+
