@@ -4,17 +4,18 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import re
 import os
-import openai
 import traceback
 from dotenv import load_dotenv
 from mail import enviar_email
+from openai import OpenAI  # ✅ Novo cliente recomendado pela OpenAI
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# ✅ Instanciando o novo cliente com API key
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
 
-# Servir arquivos estaticos e index.html
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
@@ -125,8 +126,9 @@ Respostas:
 {blocos}
 """
 
+# ✅ NOVA FORMA de chamada para OpenAI >= 1.0.0
 def chamar_llm(prompt):
-    resposta = openai.ChatCompletion.create(
+    resposta = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
@@ -134,4 +136,3 @@ def chamar_llm(prompt):
         ]
     )
     return resposta.choices[0].message.content
-
