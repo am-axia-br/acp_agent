@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -128,7 +128,7 @@
   <h2>Converse com o Agente ACP</h2>
 
   <form id="chat-form">
-    <input type="text" id="mensagem" placeholder="Digite aqui (Ex: DDD9XXXXYYYY)" required>
+    <input type="text" id="mensagem" required>
     <button type="submit">Enviar</button>
   </form>
 
@@ -161,6 +161,7 @@
     const emailFinal = document.getElementById("emailFinal");
     const carregando = document.getElementById("carregando");
     const barra = document.getElementById("barra");
+    const inputMensagem = document.getElementById("mensagem");
 
     let progresso = 0;
     let intervalo;
@@ -168,7 +169,7 @@
 
     document.getElementById("chat-form").addEventListener("submit", async function (e) {
       e.preventDefault();
-      const mensagem = document.getElementById("mensagem").value;
+      const mensagem = inputMensagem.value;
 
       const divUser = document.createElement("div");
       divUser.className = "mensagem usuario";
@@ -211,9 +212,17 @@
           return;
         }
 
+        // Detecta pergunta de WhatsApp e altera placeholder dinamicamente
+        const textoIa = data.pergunta || data.mensagem || JSON.stringify(data);
+        if (textoIa.includes("Qual o seu WhatsApp")) {
+          inputMensagem.placeholder = "Ex: DDD9XXXXYYYY";
+        } else {
+          inputMensagem.placeholder = "";
+        }
+
         const divIa = document.createElement("div");
         divIa.className = "mensagem ia";
-        divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
+        divIa.textContent = textoIa;
         mensagens.appendChild(divIa);
         mensagens.scrollTop = mensagens.scrollHeight;
 
@@ -222,8 +231,8 @@
         alert("Erro ao conectar com o servidor.");
       }
 
-      document.getElementById("mensagem").value = "";
-      document.getElementById("mensagem").focus();
+      inputMensagem.value = "";
+      inputMensagem.focus();
     });
 
     function reiniciarConversa() {
@@ -235,6 +244,7 @@
       mensagens.style.display = 'block';
       barra.style.width = '0%';
       aguardandoDiagnostico = false;
+      inputMensagem.placeholder = "";
       alert("Diagnóstico reiniciado localmente. Recarregue a página para reiniciar no servidor.");
     }
 
@@ -244,3 +254,4 @@
   </script>
 </body>
 </html>
+
