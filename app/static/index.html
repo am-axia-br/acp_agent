@@ -211,6 +211,7 @@
 
         const textoIa = data.pergunta || data.mensagem || JSON.stringify(data);
 
+        // Muda dinamicamente o placeholder somente se for a etapa do WhatsApp
         if (textoIa.includes("Qual o seu WhatsApp")) {
           inputMensagem.placeholder = "Ex: DDD9XXXXYYYY";
         } else {
@@ -253,5 +254,6 @@
   </script>
 </body>
 </html>
+
 
 

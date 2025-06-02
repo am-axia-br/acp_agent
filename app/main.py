@@ -70,6 +70,7 @@ async def chat(req: Request):
         return {"pergunta": "Qual o seu WhatsApp? (Ex: DDD9XXXXYYYY)"}
 
     if not data["whatsapp"]:
+        msg = re.sub(r"\D", "", msg)  # Remove tudo que não for número
         if re.match(r"^\d{11}$", msg):
             data["whatsapp"] = msg
             return {"pergunta": "Qual o seu e-mail?"}
