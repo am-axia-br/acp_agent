@@ -20,7 +20,8 @@ def enviar_email(data, resposta):
     msg["From"] = remetente
     msg["To"] = destinatario
 
-    resposta_formatada = resposta.replace('. ', '.<br><br>')
+    # Converte quebras de linha em parágrafos
+    resposta_formatada = "".join(f"<p>{linha.strip()}</p>" for linha in resposta.split("\n") if linha.strip())
 
     corpo = f"""
     <html>
@@ -29,29 +30,34 @@ def enviar_email(data, resposta):
         body {{
           font-family: 'Inter', sans-serif;
           color: #333;
-          line-height: 1.6;
+          background-color: #fdfbfb;
+          padding: 20px;
         }}
         .container {{
           max-width: 700px;
           margin: auto;
-          padding: 30px;
-          background-color: #fff9f5;
-          border: 1px solid #ffe1d6;
+          background-color: #ffffff;
+          border: 1px solid #e0dede;
           border-radius: 10px;
+          padding: 30px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.05);
         }}
         .titulo {{
           font-size: 20px;
           font-weight: bold;
-          color: #a638ec;
-          margin-bottom: 15px;
+          color: #7b2cbf;
+          margin-bottom: 20px;
         }}
         .paragrafo {{
-          margin-bottom: 12px;
+          font-size: 16px;
+          margin-bottom: 20px;
+          line-height: 1.6;
         }}
         .assinatura {{
-          margin-top: 30px;
+          margin-top: 40px;
           font-size: 14px;
           color: #999;
+          text-align: center;
         }}
       </style>
     </head>
@@ -61,10 +67,10 @@ def enviar_email(data, resposta):
 
         <div class="paragrafo">
           <strong>Olá, {data['nome']},</strong><br><br>
-          Abaixo está o diagnóstico detalhado com base nas suas respostas:
+          Com base nas suas respostas, desenvolvemos abaixo o diagnóstico detalhado para sua empresa:
         </div>
 
-        <div class="paragrafo">{resposta_formatada}</div>
+        {resposta_formatada}
 
         <div class="assinatura">
           Enviado automaticamente por IA – Agente ACP<br>
@@ -84,3 +90,4 @@ def enviar_email(data, resposta):
         print("✅ E-mail enviado com sucesso!")
     except Exception as e:
         print(f"❌ Erro ao enviar e-mail: {e}")
+

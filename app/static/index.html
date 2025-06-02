@@ -138,7 +138,7 @@
   <pre id="resposta"></pre>
 
   <div id="carregando">
-    <p>Analisando as respostas e desenvolvendo um projeto para sua empresa...</p>
+    <p>Analisando as respostas e preparando o seu diagnóstico...</p>
     <div id="barra-progresso"><div id="barra"></div></div>
   </div>
 
@@ -164,6 +164,7 @@
 
     let progresso = 0;
     let intervalo;
+    let aguardandoDiagnostico = false;
 
     document.getElementById("chat-form").addEventListener("submit", async function (e) {
       e.preventDefault();
@@ -191,20 +192,23 @@
           carregando.style.display = 'block';
           progresso = 0;
           barra.style.width = '0%';
+          aguardandoDiagnostico = true;
+
           intervalo = setInterval(() => {
-            progresso += 0.3;
+            progresso += 0.5;
             barra.style.width = progresso + '%';
             if (progresso >= 100) clearInterval(intervalo);
           }, 100);
-          return;
-        }
 
-        if (data.resumo) {
+          const respostaFinal = await fetch("/gerar-diagnostico", { method: "POST" });
+          const finalData = await respostaFinal.json();
+
           clearInterval(intervalo);
           carregando.style.display = 'none';
           finalizacao.style.display = 'block';
-          resumoDiagnostico.textContent = data.resumo;
-          emailFinal.textContent = data?.email || 'seu e-mail';
+          resumoDiagnostico.textContent = finalData.resumo;
+          emailFinal.textContent = finalData?.email || 'seu e-mail';
+          return;
         }
 
         const divIa = document.createElement("div");
@@ -230,6 +234,7 @@
       document.getElementById("chat-form").style.display = 'block';
       mensagens.style.display = 'block';
       barra.style.width = '0%';
+      aguardandoDiagnostico = false;
       alert("Diagnóstico reiniciado localmente. Recarregue a página para reiniciar no servidor.");
     }
 
@@ -239,6 +244,7 @@
   </script>
 </body>
 </html>
+
 
 
 

@@ -36,7 +36,8 @@ data = {
     "diagnostico": [],
     "etapa_atual": 0,
     "finalizado": False,
-    "iniciado": False
+    "iniciado": False,
+    "prompt": None
 }
 
 perguntas = [
@@ -87,21 +88,36 @@ async def chat(req: Request):
         else:
             try:
                 prompt = gerar_prompt(data)
-                resposta = chamar_llm(prompt)
+                data["prompt"] = prompt
                 data["finalizado"] = True
                 return {
-                    "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
-                    "resumo": resposta,
-                    "email": data["email"]
+                    "mensagem": "Analisando as respostas e preparando o seu diagnóstico...",
+                    "loading": True
                 }
             except Exception as e:
                 return {
-                    "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
-                    "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
+                    "mensagem": "Ocorreu um erro ao preparar o diagnóstico.",
+                    "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
                     "email": data["email"]
                 }
 
     return {"mensagem": "Diagnóstico já concluído."}
+
+@app.post("/gerar-diagnostico")
+async def gerar_diagnostico():
+    try:
+        resposta = chamar_llm(data["prompt"])
+        return {
+            "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
+            "resumo": resposta,
+            "email": data["email"]
+        }
+    except Exception as e:
+        return {
+            "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
+            "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
+            "email": data["email"]
+        }
 
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).strip()
@@ -136,6 +152,7 @@ def chamar_llm(prompt):
     linhas = texto.replace('. ', '.\n')
     enviar_email(data, linhas)
     return linhas
+
 
 
 
