@@ -15,20 +15,24 @@
       flex-direction: column;
       height: 100vh;
     }
+
     .logo {
       display: block;
       margin: 20px auto 10px;
       max-width: 250px;
     }
+
     h2 {
       text-align: center;
       color: #7b2cbf;
       margin: 10px 0;
     }
+
     #chat-form {
       text-align: center;
       margin: 10px 0;
     }
+
     #mensagem {
       width: 60%;
       padding: 10px;
@@ -36,6 +40,7 @@
       border-radius: 8px;
       font-size: 16px;
     }
+
     button {
       background: linear-gradient(90deg, #a638ec, #fc6736);
       color: white;
@@ -46,12 +51,15 @@
       cursor: pointer;
       font-weight: bold;
     }
+
     #resetar {
       background: #7b2cbf;
       margin: 10px auto;
       display: block;
     }
+
     #mensagens {
+      display: none;
       flex: 1;
       max-width: 800px;
       margin: 0 auto;
@@ -62,13 +70,17 @@
       overflow-y: auto;
       white-space: pre-wrap;
       min-height: 300px;
+      max-height: 500px;
     }
+
     #resposta {
       display: none;
     }
+
     .mensagem { margin: 10px 0; }
     .usuario { font-weight: bold; color: #5e17eb; }
     .ia { font-style: italic; color: #fc6736; }
+
     #finalizacao {
       max-width: 800px;
       margin: 20px auto;
@@ -79,12 +91,14 @@
       display: none;
       white-space: pre-wrap;
     }
+
     #carregando {
       display: none;
       text-align: center;
       font-weight: bold;
       margin-top: 20px;
     }
+
     #barra-progresso {
       width: 80%;
       height: 12px;
@@ -93,12 +107,14 @@
       border-radius: 6px;
       overflow: hidden;
     }
+
     #barra {
       height: 100%;
       width: 0%;
       background: linear-gradient(90deg, #7b2cbf, #fc6736);
-      transition: width 1s linear;
+      transition: width 0.3s linear;
     }
+
     footer {
       text-align: center;
       padding: 10px;
@@ -149,7 +165,7 @@
     let progresso = 0;
     let intervalo;
 
-    document.getElementById("chat-form").addEventListener("submit", async function(e) {
+    document.getElementById("chat-form").addEventListener("submit", async function (e) {
       e.preventDefault();
       const mensagem = document.getElementById("mensagem").value;
 
@@ -157,6 +173,8 @@
       divUser.className = "mensagem usuario";
       divUser.textContent = "Você: " + mensagem;
       mensagens.appendChild(divUser);
+
+      mensagens.style.display = 'block';
 
       try {
         const response = await fetch("/chat", {
@@ -221,4 +239,6 @@
   </script>
 </body>
 </html>
+
+
 
