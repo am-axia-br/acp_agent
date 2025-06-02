@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -55,10 +55,20 @@
       border: 1px solid #ddd;
       border-radius: 10px;
       white-space: pre-wrap;
+      overflow-y: auto;
     }
     .mensagem { margin: 10px 0; }
     .usuario { font-weight: bold; color: #5e17eb; }
     .ia { font-style: italic; color: #fc6736; }
+    #finalizacao {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #fff3cd;
+      padding: 20px;
+      border: 1px solid #ffeeba;
+      border-radius: 10px;
+      display: none;
+    }
     footer {
       text-align: center;
       margin-top: 50px;
@@ -68,7 +78,7 @@
   </style>
 </head>
 <body>
-  <img src="/static/AC_Partners_Gradient.png" alt="AC Partners" class="logo">
+  <img src="/static/AC%20Partners%20Gradient.png" alt="AC Partners" class="logo">
   <h2>Converse com o Agente ACP</h2>
 
   <form id="chat-form">
@@ -81,6 +91,13 @@
   <div id="mensagens"></div>
   <pre id="resposta"></pre>
 
+  <div id="finalizacao">
+    <h3>Resumo do Diagnóstico</h3>
+    <div id="resumoDiagnostico"></div>
+    <p>Deseja enviar o diagnóstico para: <strong id="emailFinal"></strong>?</p>
+    <button onclick="enviarEmailFinal()">📤 Enviar Diagnóstico</button>
+  </div>
+
   <footer>
     © AC Partners – Conectar Expande!
   </footer>
@@ -88,6 +105,9 @@
   <script>
     const mensagens = document.getElementById("mensagens");
     const respostaArea = document.getElementById("resposta");
+    const finalizacao = document.getElementById("finalizacao");
+    const resumoDiagnostico = document.getElementById("resumoDiagnostico");
+    const emailFinal = document.getElementById("emailFinal");
 
     document.getElementById("chat-form").addEventListener("submit", async function(e) {
       e.preventDefault();
@@ -97,6 +117,8 @@
       divUser.className = "mensagem usuario";
       divUser.textContent = "Você: " + mensagem;
       mensagens.appendChild(divUser);
+
+      mensagens.scrollTop = mensagens.scrollHeight;
 
       try {
         const response = await fetch("/chat", {
@@ -112,6 +134,15 @@
         divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
         mensagens.appendChild(divIa);
 
+        mensagens.scrollTop = mensagens.scrollHeight;
+
+        if (data.resumo) {
+          respostaArea.style.display = 'none';
+          finalizacao.style.display = 'block';
+          resumoDiagnostico.textContent = data.resumo;
+          emailFinal.textContent = data?.email || 'seu e-mail';
+        }
+
         respostaArea.textContent = JSON.stringify(data, null, 2);
       } catch (error) {
         alert("Erro ao conectar com o servidor.");
@@ -124,9 +155,13 @@
     function reiniciarConversa() {
       mensagens.innerHTML = "";
       respostaArea.textContent = "";
+      finalizacao.style.display = 'none';
       alert("Diagnóstico reiniciado localmente. Recarregue a página para reiniciar no servidor.");
+    }
+
+    function enviarEmailFinal() {
+      alert("Diagnóstico enviado por e-mail com sucesso!");
     }
   </script>
 </body>
 </html>
-

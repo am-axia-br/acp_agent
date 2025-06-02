@@ -98,7 +98,8 @@ async def chat(req: Request):
             enviar_email(data, resposta)
             return {
                 "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
-                "resumo": resposta
+                "resumo": resposta,
+                "email": data["email"]
             }
 
     return {"mensagem": "Diagnóstico já concluído."}
