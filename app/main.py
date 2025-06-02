@@ -10,6 +10,7 @@ import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
+from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html  # Integração cuidadosa
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -138,19 +139,19 @@ async def resetar_diagnostico():
     return {"status": "resetado"}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).strip()
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+
+    segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
+    cidades_df = filtrar_municipios_por_segmento(segmento)
+    cidades_html = gerar_tabela_html(cidades_df)
+
     return f"""
 Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça um diagnóstico detalhado com os seguintes tópicos:
 
 1. Sugestões de modelos ideais de canais de vendas.
 2. Perfis ideais de empresas para parceria, canal ou alianças.
-3. As 20 cidades brasileiras com maior potencial para atuação da empresa {data['empresa']}, trazendo os seguintes dados:
-   - Nome da cidade
-   - População Estimada
-   - PIB Atual
-   - Número de empresas nos segmentos de atuação da {data['empresa']}
-   - Segmento Econômico Principal
-   - Número estimado de empresas com Perfil para Parceria com a {data['empresa']}, com base nos modelos indicados
+3. Considerando os dados reais do IBGE, analise as cidades listadas e indique por que elas são estratégicas para a empresa {data['empresa']}. Base:
+{cidades_html}
 4. Projeção de faturamento com 20 canais ativos.
 5. Tipos de apoio e recursos que a empresa pode oferecer aos parceiros.
 
