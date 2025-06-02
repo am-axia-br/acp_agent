@@ -140,19 +140,19 @@ async def resetar_diagnostico():
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).strip()
     return f"""
-Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça:
+Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça um diagnóstico detalhado com os seguintes tópicos:
 
-1. Sugestões de modelos ideais de canais de vendas para esse tipo de empresa
-2. Perfis ideais de empresas para parcerias, alianças e canais de vendas
-3. As 20 cidades brasileiras com maior potencial para atuação da empresa {data['empresa']}, apresentando:
+1. Sugestões de modelos ideais de canais de vendas.
+2. Perfis ideais de empresas para parceria, canal ou alianças.
+3. As 20 cidades brasileiras com maior potencial para atuação da empresa {data['empresa']}, trazendo os seguintes dados:
    - Nome da cidade
    - População Estimada
    - PIB Atual
    - Número de empresas nos segmentos de atuação da {data['empresa']}
    - Segmento Econômico Principal
    - Número estimado de empresas com Perfil para Parceria com a {data['empresa']}, com base nos modelos indicados
-4. Projeção de faturamento com 20 canais ativos
-5. Quais tipos de apoio e recursos essa empresa pode oferecer aos parceiros comerciais
+4. Projeção de faturamento com 20 canais ativos.
+5. Tipos de apoio e recursos que a empresa pode oferecer aos parceiros.
 
 Dados do diagnóstico:
 Nome: {data['nome']}
@@ -168,12 +168,27 @@ def chamar_llm(prompt):
     resposta = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados de cidades brasileiras. Use informações verificadas para compor sua resposta."},
+            {"role": "system", "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante."},
             {"role": "user", "content": prompt}
         ]
     )
     texto = resposta.choices[0].message.content.strip()
-    linhas = texto.replace('. ', '.\n')
-    enviar_email(data, linhas)
-    return linhas
 
+    # FORMATAÇÃO FINAL DO HTML PARA EXIBIÇÃO E E-MAIL
+    linhas_formatadas = []
+    for linha in texto.split("\n"):
+        linha = linha.strip()
+        if not linha:
+            continue
+        elif linha.lower().startswith("### "):
+            linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>")
+        elif linha.lower().startswith("## "):
+            linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>")
+        elif linha.lower().startswith("# "):
+            linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>")
+        else:
+            linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>")
+
+    html_formatado = "\n".join(linhas_formatadas)
+    enviar_email(data, html_formatado)
+    return html_formatado

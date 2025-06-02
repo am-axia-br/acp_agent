@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -132,6 +132,11 @@
       font-size: 14px;
       color: #666;
     }
+
+    h3, h4 {
+      color: #5e17eb;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -156,8 +161,10 @@
   <div id="finalizacao">
     <h3>Resumo do Diagnóstico</h3>
     <div id="resumoDiagnostico"></div>
+
     <div id="cidades"></div>
-    <p>Deseja enviar o diagnóstico para: <strong id="emailFinal"></strong>?</p>
+
+    <p style="margin-top: 20px;">Deseja enviar o diagnóstico para: <strong id="emailFinal"></strong>?</p>
     <button onclick="enviarEmailFinal()">📤 Enviar Diagnóstico</button>
   </div>
 
@@ -221,11 +228,11 @@
           const textoCompleto = finalData.resumo;
           const partes = textoCompleto.split("\n\n");
 
-          // Exibir resumo geral e cidades separadamente
-          resumoDiagnostico.innerHTML = partes[0];
-          if (partes[1]) {
+          resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${partes[0]}</div>`;
+
+          if (partes.length > 1) {
             cidadesDiv.style.display = 'block';
-            cidadesDiv.innerHTML = "<h4>📍 Cidades com Potencial:</h4><br>" + partes.slice(1).join("\n\n");
+            cidadesDiv.innerHTML = `<h4>📍 Cidades com Potencial</h4><br>${partes.slice(1).join("<br><br>")}`;
           }
 
           emailFinal.textContent = finalData?.email || 'seu e-mail';
@@ -263,6 +270,7 @@
       document.getElementById("chat-form").style.display = 'block';
       mensagens.style.display = 'block';
       barra.style.width = '0%';
+      cidadesDiv.style.display = 'none';
       inputMensagem.placeholder = "";
 
       fetch("/reset", { method: "POST" })

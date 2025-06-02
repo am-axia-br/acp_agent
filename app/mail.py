@@ -40,17 +40,17 @@ def formatar_tabela_cidades(texto):
     linhas_html = ""
     for c in cidades:
         linhas_html += f"""
-        <tr><td colspan="2"><strong>{c.get("nome", "")}</strong></td></tr>
+        <tr><td colspan="2" style="font-weight:bold; font-size: 16px; padding-top: 15px;">{c.get("nome", "")}</td></tr>
         <tr><td>📍 {c.get("populacao", "")}</td><td>{c.get("pib", "")}</td></tr>
         <tr><td>{c.get("segmentos", "")}</td><td>{c.get("principal", "")}</td></tr>
-        <tr><td colspan="2">{c.get("perfil", "")}</td></tr>
+        <tr><td colspan="2" style="padding-bottom:10px;">{c.get("perfil", "")}</td></tr>
         <tr><td colspan="2"><hr></td></tr>
         """
 
     return f"""
     <div class="paragrafo">
-      <strong>📊 Cidades com maior potencial para parcerias:</strong><br><br>
-      <table border="0" width="100%" style="font-size:15px; line-height:1.5;">
+      <h3 style="color: #5e17eb;">📊 Cidades com maior potencial para parcerias</h3>
+      <table border="0" width="100%" style="font-size:15px; line-height:1.5; border-collapse:collapse;">
         {linhas_html}
       </table>
     </div>
@@ -70,13 +70,13 @@ def enviar_email(data, resposta):
     msg["From"] = remetente
     msg["To"] = destinatario
 
-    # Verifica e extrai bloco das cidades, se houver
+    # Separa o trecho das cidades do restante do texto
     trecho_cidades = formatar_tabela_cidades(resposta)
-    # Remove o trecho das cidades do restante da resposta para evitar duplicação
     if trecho_cidades:
         resposta = re.sub(r"\d{1,2}\..+?(?:perfil para parceria.+?\n?)", "", resposta, flags=re.DOTALL | re.IGNORECASE)
 
-    resposta_formatada = "".join(f"<p>{linha.strip()}</p>" for linha in resposta.split("\n") if linha.strip())
+    # Formata os parágrafos do restante da resposta
+    resposta_formatada = "".join(f"<p style='margin-bottom: 15px;'>{linha.strip()}</p>" for linha in resposta.split("\n") if linha.strip())
 
     corpo = f"""
     <html>
@@ -114,6 +114,10 @@ def enviar_email(data, resposta):
           color: #999;
           text-align: center;
         }}
+        table td {{
+          padding: 4px 8px;
+          vertical-align: top;
+        }}
       </style>
     </head>
     <body>
@@ -147,3 +151,5 @@ def enviar_email(data, resposta):
         print("✅ E-mail enviado com sucesso!")
     except Exception as e:
         print(f"❌ Erro ao enviar e-mail: {e}")
+
+
