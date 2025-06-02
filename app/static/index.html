@@ -165,7 +165,6 @@
 
     let progresso = 0;
     let intervalo;
-    let aguardandoDiagnostico = false;
 
     document.getElementById("chat-form").addEventListener("submit", async function (e) {
       e.preventDefault();
@@ -175,7 +174,6 @@
       divUser.className = "mensagem usuario";
       divUser.textContent = "Você: " + mensagem;
       mensagens.appendChild(divUser);
-
       mensagens.style.display = 'block';
 
       try {
@@ -193,7 +191,6 @@
           carregando.style.display = 'block';
           progresso = 0;
           barra.style.width = '0%';
-          aguardandoDiagnostico = true;
 
           intervalo = setInterval(() => {
             progresso += 0.5;
@@ -212,8 +209,8 @@
           return;
         }
 
-        // Detecta pergunta de WhatsApp e altera placeholder dinamicamente
         const textoIa = data.pergunta || data.mensagem || JSON.stringify(data);
+
         if (textoIa.includes("Qual o seu WhatsApp")) {
           inputMensagem.placeholder = "Ex: DDD9XXXXYYYY";
         } else {
@@ -243,9 +240,11 @@
       document.getElementById("chat-form").style.display = 'block';
       mensagens.style.display = 'block';
       barra.style.width = '0%';
-      aguardandoDiagnostico = false;
       inputMensagem.placeholder = "";
-      alert("Diagnóstico reiniciado localmente. Recarregue a página para reiniciar no servidor.");
+
+      fetch("/reset", { method: "POST" })
+        .then(() => console.log("Reset realizado no backend"))
+        .catch(() => alert("Erro ao tentar reiniciar o diagnóstico no servidor."));
     }
 
     function enviarEmailFinal() {
@@ -254,4 +253,5 @@
   </script>
 </body>
 </html>
+
 

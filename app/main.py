@@ -28,6 +28,7 @@ def chat_get():
 class Mensagem(BaseModel):
     mensagem: str
 
+# Variável global para armazenar os dados da conversa
 data = {
     "nome": None,
     "empresa": None,
@@ -118,6 +119,22 @@ async def gerar_diagnostico():
             "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
             "email": data["email"]
         }
+
+@app.post("/reset")
+async def resetar_diagnostico():
+    global data
+    data = {
+        "nome": None,
+        "empresa": None,
+        "whatsapp": None,
+        "email": None,
+        "diagnostico": [],
+        "etapa_atual": 0,
+        "finalizado": False,
+        "iniciado": False,
+        "prompt": None
+    }
+    return {"status": "resetado"}
 
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).strip()
