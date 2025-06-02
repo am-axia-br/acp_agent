@@ -18,7 +18,8 @@ data = {
     "email": None,
     "diagnostico": [],
     "etapa_atual": 0,
-    "finalizado": False
+    "finalizado": False,
+    "iniciado": False
 }
 
 perguntas = [
@@ -52,6 +53,11 @@ async def chat(req: Request):
     body = await req.json()
     msg = body.get("mensagem", "").strip()
 
+    # Início automático do diagnóstico com qualquer mensagem
+    if not data["iniciado"]:
+        data["iniciado"] = True
+        return {"mensagem": "Olá! Sou o Agente ACP, especialista em canais de vendas. Para começarmos, qual o seu nome?"}
+
     if not data["nome"]:
         data["nome"] = msg
         return {"pergunta": "Qual o nome da sua empresa?"}
@@ -81,10 +87,7 @@ async def chat(req: Request):
             prompt = gerar_prompt(data)
             resposta = chamar_llm(prompt)
             data["finalizado"] = True
-
-            # Envia por e-mail
             enviar_email(data, resposta)
-
             return {
                 "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
                 "resumo": resposta

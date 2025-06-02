@@ -1,7 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
+  <meta charset="UTF-8">
   <title>Teste do Agente ACP</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7f7; padding: 40px; }
+    h2 { text-align: center; }
+    #chat-form { text-align: center; margin-bottom: 30px; }
+    #mensagem { width: 60%; padding: 10px; }
+    #resposta, #mensagens { max-width: 700px; margin: 20px auto; background: white; padding: 20px; border: 1px solid #ddd; border-radius: 10px; white-space: pre-wrap; }
+    .mensagem { margin: 10px 0; }
+    .usuario { font-weight: bold; color: #004aad; }
+    .ia { font-style: italic; }
+  </style>
 </head>
 <body>
   <h2>Conversar com o Agente ACP</h2>
@@ -9,13 +20,22 @@
     <input type="text" id="mensagem" placeholder="Digite aqui" required>
     <button type="submit">Enviar</button>
   </form>
+
+  <div id="mensagens"></div>
   <pre id="resposta"></pre>
 
   <script>
+    const mensagens = document.getElementById("mensagens");
+    const respostaArea = document.getElementById("resposta");
+
     document.getElementById("chat-form").addEventListener("submit", async function(e) {
       e.preventDefault();
       const mensagem = document.getElementById("mensagem").value;
-      const respostaArea = document.getElementById("resposta");
+
+      const divUser = document.createElement("div");
+      divUser.className = "mensagem usuario";
+      divUser.textContent = "Você: " + mensagem;
+      mensagens.appendChild(divUser);
 
       const response = await fetch("https://acp-agent.onrender.com/chat", {
         method: "POST",
@@ -24,7 +44,15 @@
       });
 
       const data = await response.json();
+
+      const divIa = document.createElement("div");
+      divIa.className = "mensagem ia";
+      divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
+      mensagens.appendChild(divIa);
+
       respostaArea.textContent = JSON.stringify(data, null, 2);
+      document.getElementById("mensagem").value = "";
+      document.getElementById("mensagem").focus();
     });
   </script>
 </body>
