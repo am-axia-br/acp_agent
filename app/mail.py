@@ -9,7 +9,13 @@ load_dotenv()
 def enviar_email(data, resposta):
     remetente = os.getenv("EMAIL_REMETENTE")
     senha = os.getenv("EMAIL_SENHA")
-    destinatario = os.getenv("EMAIL_DESTINO", data["email"])
+
+    # usa o e-mail do formulário, mas se não tiver, tenta o .env
+    destinatario = data.get("email") or os.getenv("EMAIL_DESTINO")
+
+    if not all([remetente, senha, destinatario]):
+        print("❌ Falta configurar EMAIL_REMETENTE, EMAIL_SENHA ou destinatário.")
+        return
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Diagnóstico de Canais - {data['empresa']}"
@@ -29,6 +35,6 @@ def enviar_email(data, resposta):
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(remetente, senha)
             server.sendmail(remetente, destinatario, msg.as_string())
-        print("E-mail enviado com sucesso!")
+        print("✅ E-mail enviado com sucesso!")
     except Exception as e:
-        print(f"Erro ao enviar e-mail: {e}")
+        print(f"❌ Erro ao enviar e-mail: {e}")
