@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
@@ -115,6 +115,17 @@
       transition: width 0.3s linear;
     }
 
+    #cidades {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #e3f2fd;
+      padding: 20px;
+      border: 1px solid #90caf9;
+      border-radius: 10px;
+      white-space: pre-wrap;
+      display: none;
+    }
+
     footer {
       text-align: center;
       padding: 10px;
@@ -145,6 +156,7 @@
   <div id="finalizacao">
     <h3>Resumo do Diagnóstico</h3>
     <div id="resumoDiagnostico"></div>
+    <div id="cidades"></div>
     <p>Deseja enviar o diagnóstico para: <strong id="emailFinal"></strong>?</p>
     <button onclick="enviarEmailFinal()">📤 Enviar Diagnóstico</button>
   </div>
@@ -162,6 +174,7 @@
     const carregando = document.getElementById("carregando");
     const barra = document.getElementById("barra");
     const inputMensagem = document.getElementById("mensagem");
+    const cidadesDiv = document.getElementById("cidades");
 
     let progresso = 0;
     let intervalo;
@@ -204,14 +217,23 @@
           clearInterval(intervalo);
           carregando.style.display = 'none';
           finalizacao.style.display = 'block';
-          resumoDiagnostico.innerHTML = finalData.resumo;
+
+          const textoCompleto = finalData.resumo;
+          const partes = textoCompleto.split("\n\n");
+
+          // Exibir resumo geral e cidades separadamente
+          resumoDiagnostico.innerHTML = partes[0];
+          if (partes[1]) {
+            cidadesDiv.style.display = 'block';
+            cidadesDiv.innerHTML = "<h4>📍 Cidades com Potencial:</h4><br>" + partes.slice(1).join("\n\n");
+          }
+
           emailFinal.textContent = finalData?.email || 'seu e-mail';
           return;
         }
 
         const textoIa = data.pergunta || data.mensagem || JSON.stringify(data);
 
-        // Muda dinamicamente o placeholder somente se for a etapa do WhatsApp
         if (textoIa.includes("Qual o seu WhatsApp")) {
           inputMensagem.placeholder = "Ex: DDD9XXXXYYYY";
         } else {
@@ -254,6 +276,3 @@
   </script>
 </body>
 </html>
-
-
-

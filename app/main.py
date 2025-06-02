@@ -6,6 +6,7 @@ import re
 import os
 import openai
 import traceback
+import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
@@ -28,7 +29,6 @@ def chat_get():
 class Mensagem(BaseModel):
     mensagem: str
 
-# Variável global para armazenar os dados da conversa
 data = {
     "nome": None,
     "empresa": None,
@@ -70,7 +70,7 @@ async def chat(req: Request):
         return {"pergunta": "Qual o seu WhatsApp? (Ex: DDD9XXXXYYYY)"}
 
     if not data["whatsapp"]:
-        msg = re.sub(r"\D", "", msg)  # Remove tudo que não for número
+        msg = re.sub(r"\D", "", msg)
         if re.match(r"^\d{11}$", msg):
             data["whatsapp"] = msg
             return {"pergunta": "Qual o seu e-mail?"}
@@ -142,11 +142,17 @@ def gerar_prompt(data):
     return f"""
 Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça:
 
-- Sugestões de modelos ideais de canais de vendas para esse tipo de empresa
-- Perfis ideais de parceiros
-- As 20 melhores cidades e regiões para buscar parceiros comerciais
-- Projeção de faturamento com 20 canais ativos
-- Quais tipos de apoio e recursos essa empresa pode oferecer aos parceiros
+1. Sugestões de modelos ideais de canais de vendas para esse tipo de empresa
+2. Perfis ideais de empresas para parcerias, alianças e canais de vendas
+3. As 20 cidades brasileiras com maior potencial para atuação da empresa {data['empresa']}, apresentando:
+   - Nome da cidade
+   - População Estimada
+   - PIB Atual
+   - Número de empresas nos segmentos de atuação da {data['empresa']}
+   - Segmento Econômico Principal
+   - Número estimado de empresas com Perfil para Parceria com a {data['empresa']}, com base nos modelos indicados
+4. Projeção de faturamento com 20 canais ativos
+5. Quais tipos de apoio e recursos essa empresa pode oferecer aos parceiros comerciais
 
 Dados do diagnóstico:
 Nome: {data['nome']}
@@ -162,7 +168,7 @@ def chamar_llm(prompt):
     resposta = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
+            {"role": "system", "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados de cidades brasileiras. Use informações verificadas para compor sua resposta."},
             {"role": "user", "content": prompt}
         ]
     )
@@ -170,3 +176,4 @@ def chamar_llm(prompt):
     linhas = texto.replace('. ', '.\n')
     enviar_email(data, linhas)
     return linhas
+
