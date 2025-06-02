@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import re
 import os
@@ -10,6 +12,20 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
+
+# Servir arquivos estaticos e index.html
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def home():
+    return FileResponse("static/index.html")
+
+@app.get("/chat")
+def chat_get():
+    return {"erro": "Método GET não permitido nesta rota. Use POST com corpo JSON contendo 'mensagem'."}
+
+class Mensagem(BaseModel):
+    mensagem: str
 
 data = {
     "nome": None,
@@ -41,19 +57,11 @@ perguntas = [
     "Você tem uma meta mensal de vendas? Quais são estas metas?"
 ]
 
-class Mensagem(BaseModel):
-    mensagem: str
-
-@app.get("/")
-def home():
-    return {"mensagem": "Agente de Canais AC Partners - Online"}
-
 @app.post("/chat")
 async def chat(req: Request):
     body = await req.json()
     msg = body.get("mensagem", "").strip()
 
-    # Início automático do diagnóstico com qualquer mensagem
     if not data["iniciado"]:
         data["iniciado"] = True
         return {"mensagem": "Olá! Sou o Agente ACP, especialista em canais de vendas. Para começarmos, qual o seu nome?"}
