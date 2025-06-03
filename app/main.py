@@ -148,7 +148,7 @@ def chamar_llm(prompt):
             ]
         )
         texto = resposta.choices[0].message.content.strip()
-        texto = texto.encode("utf-8", "ignore").decode("utf-8")
+        texto = texto.encode("utf-8", "replace").decode("utf-8")
 
         linhas_formatadas = []
         for linha in texto.split("\n"):
