@@ -60,7 +60,7 @@ async def chat(req: Request):
 
     if not data["iniciado"]:
         data["iniciado"] = True
-        return {"mensagem": "Olá... Eu sou uma IA especialista em canais de vendas e o meu objetivo é te apresentar uma estratégia para você escalar suas vendas através de alianças, parcerias e canais de vendas... Vou te fazer algumas perguntas de forma que eu tenha as informações necessárias para gerar um diagnóstico completo e todas as ações que você deverá tomar. Para começarmos, me fale o seu nome..."}
+        return {"mensagem": "Olá... Eu sou uma IA especialista em canais de vendas... Me fale o seu nome..."}
 
     if not data["nome"]:
         data["nome"] = msg
@@ -93,16 +93,9 @@ async def chat(req: Request):
                 prompt = gerar_prompt(data)
                 data["prompt"] = prompt
                 data["finalizado"] = True
-                return {
-                    "mensagem": "Analisando as respostas e preparando o seu diagnóstico...",
-                    "loading": True
-                }
+                return {"mensagem": "Analisando as respostas e preparando o seu diagnóstico...", "loading": True}
             except Exception as e:
-                return {
-                    "mensagem": "Ocorreu um erro ao preparar o diagnóstico.",
-                    "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
-                    "email": data["email"]
-                }
+                return {"mensagem": "Ocorreu um erro ao preparar o diagnóstico.", "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
 
     return {"mensagem": "Diagnóstico já concluído."}
 
@@ -110,41 +103,21 @@ async def chat(req: Request):
 async def gerar_diagnostico():
     try:
         resposta = chamar_llm(data["prompt"])
-        return {
-            "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
-            "resumo": resposta,
-            "email": data["email"]
-        }
+        return {"mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:", "resumo": resposta, "email": data["email"]}
     except Exception as e:
-        return {
-            "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
-            "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
-            "email": data["email"]
-        }
+        return {"mensagem": "Ocorreu um erro ao gerar o diagnóstico.", "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
 
 @app.post("/reset")
 async def resetar_diagnostico():
     global data
-    data = {
-        "nome": None,
-        "empresa": None,
-        "whatsapp": None,
-        "email": None,
-        "diagnostico": [],
-        "etapa_atual": 0,
-        "finalizado": False,
-        "iniciado": False,
-        "prompt": None
-    }
+    data = {"nome": None, "empresa": None, "whatsapp": None, "email": None, "diagnostico": [], "etapa_atual": 0, "finalizado": False, "iniciado": False, "prompt": None}
     return {"status": "resetado"}
 
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
-
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
     cidades_df = filtrar_municipios_por_segmento(segmento)
     cidades_html = gerar_tabela_html(cidades_df)
-
     return f"""
 Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça um diagnóstico detalhado com os seguintes tópicos:
 
@@ -166,30 +139,36 @@ Respostas:
 """
 
 def chamar_llm(prompt):
-    resposta = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    texto = resposta.choices[0].message.content.strip()
+    try:
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        texto = resposta.choices[0].message.content.strip()
+        texto.encode("utf-8", errors="ignore")
 
-    # FORMATAÇÃO FINAL DO HTML PARA EXIBIÇÃO E E-MAIL
-    linhas_formatadas = []
-    for linha in texto.split("\n"):
-        linha = linha.strip()
-        if not linha:
-            continue
-        elif linha.lower().startswith("### "):
-            linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>")
-        elif linha.lower().startswith("## "):
-            linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>")
-        elif linha.lower().startswith("# "):
-            linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>")
-        else:
-            linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>")
+        linhas_formatadas = []
+        for linha in texto.split("\n"):
+            linha = linha.strip()
+            if not linha:
+                continue
+            elif linha.lower().startswith("### "):
+                linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>")
+            elif linha.lower().startswith("## "):
+                linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>")
+            elif linha.lower().startswith("# "):
+                linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>")
+            else:
+                linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>")
 
-    html_formatado = "\n".join(linhas_formatadas)
-    enviar_email(data, html_formatado)
-    return html_formatado
+        html_formatado = "\n".join(linhas_formatadas)
+        enviar_email(data, html_formatado)
+        return html_formatado
+
+    except UnicodeEncodeError as e:
+        return f"Erro de codificação ao gerar sugestão: {str(e)}"
+    except Exception as e:
+        return f"Erro inesperado ao chamar LLM: {str(e)}"
