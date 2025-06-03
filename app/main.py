@@ -148,7 +148,7 @@ def chamar_llm(prompt):
             ]
         )
         texto = resposta.choices[0].message.content.strip()
-        texto.encode("utf-8", errors="ignore")
+        texto = texto.encode("utf-8", "ignore").decode("utf-8")
 
         linhas_formatadas = []
         for linha in texto.split("\n"):
@@ -172,3 +172,4 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
+
