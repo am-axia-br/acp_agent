@@ -160,11 +160,20 @@ def gerar_prompt(data):
     cidades_html = gerar_tabela_html(cidades_df)
 
     try:
-        ticket = float(str(data["diagnostico"][7]).replace("R$", "").replace(",", "").strip())
-        ciclo = int(str(data["diagnostico"][8]).strip())
-        novos_clientes = int(str(data["diagnostico"][9]).strip())
+        raw_ticket = str(data["diagnostico"][7]).strip().replace("R$", "").replace(",", "").replace(".", "")
+        raw_ciclo = str(data["diagnostico"][8]).strip()
+        raw_novos = str(data["diagnostico"][9]).strip()
+
+        if not raw_ticket.isdigit() or not raw_ciclo.isdigit() or not raw_novos.isdigit():
+            raise ValueError(f"Valores inválidos recebidos: ticket={raw_ticket}, ciclo={raw_ciclo}, novos={raw_novos}")
+
+        ticket = float(raw_ticket)
+        ciclo = int(raw_ciclo)
+        novos_clientes = int(raw_novos)
     except Exception as e:
-        raise ValueError("Erro ao converter ticket, ciclo ou novos_clientes para número.") from e
+        raise ValueError(
+            f"Erro ao converter valores numéricos: {str(e)} | "
+            f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}") from e
 
     conhecimento_parcerias = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
     conhecimento_formatado = f"\n### Base de Conhecimento sobre Parcerias:\n\n{conhecimento_parcerias}\n\n"
