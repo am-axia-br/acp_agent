@@ -10,7 +10,7 @@ import os
 
 # Corrigido: agora aponta direto para a raiz 'app/'
 BASE_DIR = "app/"
-ARQUIVO_EXCEL = os.path.join(BASE_DIR, "conhecimento_canais_completo.xlsx")
+ARQUIVO_EXCEL = os.path.join(BASE_DIR, "parcerias.xlsx")
 INDEX_DIR = os.path.join(BASE_DIR, "vectorstore_canais/")
 
 # Garante apenas o diretório do índice
