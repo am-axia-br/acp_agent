@@ -1,3 +1,6 @@
+from log_config import get_logger
+logger = get_logger(__name__)
+
 perfil_prospect = {
     "nome_empresa": None,
     "segmento": None,

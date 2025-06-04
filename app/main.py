@@ -1,3 +1,6 @@
+from log_config import get_logger
+logger = get_logger(__name__)
+
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +20,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+logger.info("Aplicação FastAPI iniciada")
 
 data = {
     "nome": None,
@@ -44,6 +49,7 @@ def home():
         "iniciado": False,
         "prompt": None
     }
+    logger.info("Página inicial acessada e dados resetados")
     return FileResponse("static/index.html")
 
 @app.get("/chat")
@@ -70,9 +76,11 @@ perguntas = [
 async def chat(req: Request):
     body = await req.json()
     msg = body.get("mensagem", "").strip()
+    logger.info(f"Mensagem recebida: {msg}")
 
     if not data["iniciado"]:
         data["iniciado"] = True
+        logger.info("Início do diagnóstico iniciado")
         return {"mensagem": "Olá... Para começarmos o diagnóstico, me fale o seu nome..."}
 
     if not data["nome"]:
@@ -88,12 +96,14 @@ async def chat(req: Request):
         if re.match(r"^\d{11}$", msg):
             data["whatsapp"] = msg
             return {"pergunta": "Qual o seu e-mail?"}
+        logger.warning("WhatsApp em formato inválido")
         return {"pergunta": "Formato inválido. Exemplo: DDD9XXXXYYYY"}
 
     if not data["email"]:
         if re.match(r"^[\w\.-]+@[\w\.-]+\.\w{2,4}$", msg):
             data["email"] = msg
             return {"mensagem": "Obrigado! Agora vamos entender melhor sua empresa.", "pergunta": perguntas[0]}
+        logger.warning("E-mail inválido")
         return {"pergunta": "E-mail inválido. Envie um formato válido."}
 
     if data["etapa_atual"] < len(perguntas):
@@ -106,8 +116,10 @@ async def chat(req: Request):
                 prompt = gerar_prompt(data)
                 data["prompt"] = prompt
                 data["finalizado"] = True
+                logger.info("Diagnóstico preparado com sucesso")
                 return {"mensagem": "Analisando as respostas e preparando o seu diagnóstico...", "loading": True}
             except Exception as e:
+                logger.error(f"Erro ao preparar diagnóstico: {str(e)}")
                 return {
                     "mensagem": "Ocorreu um erro ao preparar o diagnóstico.",
                     "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
@@ -120,12 +132,14 @@ async def chat(req: Request):
 async def gerar_diagnostico():
     try:
         resposta = chamar_llm(data["prompt"])
+        logger.info("Diagnóstico gerado com sucesso pela LLM")
         return {
             "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
             "resumo": resposta,
             "email": data["email"]
         }
     except Exception as e:
+        logger.error(f"Erro ao gerar diagnóstico: {str(e)}")
         return {
             "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
             "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
@@ -146,7 +160,23 @@ async def resetar_diagnostico():
         "iniciado": False,
         "prompt": None
     }
+    logger.info("Diagnóstico resetado pelo usuário")
     return {"status": "resetado"}
+
+@app.post("/reindexar-rag")
+async def reindexar_rag():
+    try:
+        from rag_parcerias import indexar_documentos
+        total = indexar_documentos()
+        logger.info(f"Reindexação realizada com {total} arquivos")
+        return {"status": "ok", "arquivos_indexados": total}
+    except Exception as e:
+        logger.error(f"Erro na reindexação do RAG: {str(e)}")
+        return {
+            "status": "erro",
+            "mensagem": str(e),
+            "detalhes": traceback.format_exc()
+        }
 
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
@@ -171,6 +201,7 @@ def gerar_prompt(data):
         ciclo = int(raw_ciclo)
         novos_clientes = int(raw_novos)
     except Exception as e:
+        logger.error("Erro ao processar valores numéricos no prompt")
         raise ValueError(
             f"Erro ao converter valores numéricos: {str(e)} | "
             f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}") from e
@@ -214,27 +245,18 @@ Respostas:
 """
 
 def chamar_llm(prompt):
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.7,
-        max_tokens=2048
-    )
-    return response.choices[0].message.content.strip()
-
-@app.post("/reindexar-rag")
-async def reindexar_rag():
     try:
-        from rag_parcerias import indexar_documentos
-        total = indexar_documentos()
-        return {"status": "ok", "arquivos_indexados": total}
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2048
+        )
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return {
-            "status": "erro",
-            "mensagem": str(e),
-            "detalhes": traceback.format_exc()
-        }
+        logger.error("Erro na chamada à API OpenAI")
+        raise RuntimeError("Erro na chamada à API OpenAI.") from e
 

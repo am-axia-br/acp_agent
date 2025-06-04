@@ -1,3 +1,6 @@
+from log_config import get_logger
+logger = get_logger(__name__)
+
 perguntas_estrategicas = {
     "nome_empresa": "Qual o nome da sua empresa?",
     "segmento": "Em qual segmento vocês atuam?",

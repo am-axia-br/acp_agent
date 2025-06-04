@@ -1,10 +1,10 @@
+from log_config import get_logger
+logger = get_logger(__name__)
+
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-
-
 
 from pathlib import Path
 import os
