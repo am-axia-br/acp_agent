@@ -10,12 +10,11 @@ import json
 import unicodedata
 from dotenv import load_dotenv
 from mail import enviar_email
-from openai import OpenAI
 from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html
 from rag_parcerias import buscar_conhecimento  # <- RAG de parcerias
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -150,6 +149,31 @@ async def resetar_diagnostico():
     }
     return {"status": "resetado"}
 
+@app.post("/reindexar-rag")
+async def reindexar_rag():
+    try:
+        from rag_parcerias import indexar_documentos
+        total = indexar_documentos()
+        return {"status": "ok", "arquivos_indexados": total}
+    except Exception as e:
+        return {
+            "status": "erro",
+            "mensagem": str(e),
+            "detalhes": traceback.format_exc()
+        }
+
+def chamar_llm(prompt):
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7,
+        max_tokens=1600
+    )
+    return response.choices[0].message["content"].strip()
+
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
@@ -177,17 +201,11 @@ Você é um consultor especialista em canais de vendas. Use os dados do cliente 
 {conhecimento_formatado}
 
 01) Resumo sobre a empresa. Pesquise no site informado e use dados disponíveis na internet.
-
 02) Situação do mercado e perfil dos clientes que essa empresa atende.
-
 03) Oportunidades de crescimento e expansão da empresa com canais de vendas.
-
 04) Liste 5 modelos ideais de canais de vendas com explicações de funcionamento, vantagens e serviços agregados.
-
 05) Descreva os perfis ideais de empresas que podem se tornar canais de vendas.
-
 06) Liste 30 cidades com maior potencial para abertura de canais (dados: nome, população, PIB, empresas no segmento, empresas com perfil de canal, salário médio). Se o RAG não retornar 30, complemente com sugestões próprias.
-
 <h3 style='color:#5e17eb;margin-top:30px;'>📍 Cidades com Potencial</h3>
 {cidades_html}
 
@@ -211,16 +229,3 @@ E-mail: {data['email']}
 Respostas:
 {blocos}
 """
-
-@app.post("/reindexar-rag")
-async def reindexar_rag():
-    try:
-        from rag_parcerias import indexar_documentos
-        total = indexar_documentos()
-        return {"status": "ok", "arquivos_indexados": total}
-    except Exception as e:
-        return {
-            "status": "erro",
-            "mensagem": str(e),
-            "detalhes": traceback.format_exc()
-        }
