@@ -162,13 +162,12 @@ def gerar_prompt(data):
     cidades_html = gerar_tabela_html(cidades_df)
 
     try:
-        ticket = float(data["diagnostico"][7].replace("R$", "").replace(",", "").strip())
-        ciclo = int(data["diagnostico"][8])
-        novos_clientes = int(data["diagnostico"][9])
-    except:
-        ticket = ciclo = novos_clientes = 0
+        ticket = float(str(data["diagnostico"][7]).replace("R$", "").replace(",", "").strip())
+        ciclo = int(str(data["diagnostico"][8]).strip())
+        novos_clientes = int(str(data["diagnostico"][9]).strip())
+    except Exception as e:
+        raise ValueError("Erro ao converter ticket, ciclo ou novos_clientes para número.") from e
 
-    # RAG de conhecimento de parcerias
     conhecimento_parcerias = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
     conhecimento_formatado = f"\n### Base de Conhecimento sobre Parcerias:\n\n{conhecimento_parcerias}\n\n"
 
@@ -213,53 +212,6 @@ Respostas:
 {blocos}
 """
 
-def limpar_unicode(texto_raw: str) -> str:
-    texto_limpo = texto_raw.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
-    texto_utf8 = texto_limpo.encode("utf-8", "replace").decode("utf-8", "replace")
-    return unicodedata.normalize("NFC", texto_utf8)
-
-def remover_surrogates(texto: str) -> str:
-    return re.sub(r'[\ud800-\udfff]', '', texto)
-
-def chamar_llm(prompt):
-    try:
-        resposta = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante. Separe cada seção com exatamente duas linhas em branco."
-                },
-                {"role": "user", "content": prompt}
-            ]
-        )
-        texto_original = resposta.choices[0].message.content
-        texto = remover_surrogates(limpar_unicode(texto_original.strip())).replace("**", "")
-
-        linhas_formatadas = []
-        for linha in texto.split("\n"):
-            linha = linha.strip()
-            if not linha:
-                continue
-            elif linha.lower().startswith("### "):
-                linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>")
-            elif linha.lower().startswith("## "):
-                linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>")
-            elif linha.lower().startswith("# "):
-                linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>")
-            else:
-                linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>")
-
-        html_formatado = "\n".join(linhas_formatadas)
-        html_formatado = re.sub(r"(\n\s*){3,}", "\n\n", html_formatado)
-
-        enviar_email(data, html_formatado)
-        return html_formatado
-
-    except UnicodeEncodeError as e:
-        return f"Erro de codificação ao gerar sugestão: {str(e)}"
-    except Exception as e:
-        return f"Erro inesperado ao chamar LLM: {str(e)}"
 @app.post("/reindexar-rag")
 async def reindexar_rag():
     try:
@@ -272,5 +224,3 @@ async def reindexar_rag():
             "mensagem": str(e),
             "detalhes": traceback.format_exc()
         }
-
-
