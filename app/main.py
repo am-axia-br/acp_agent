@@ -65,7 +65,7 @@ perguntas = [
     "Qual o modelo de negócio da empresa? Comercializa licenças? Cobra mensalidade? Cobra projeto?",
     "Qual o ticket médio dos negócios?",
     "Qual o ciclo médio de vendas (em dias)?",
-    "Qual a meta mensal de vendas esperada por canal (em R$)?"
+    "Qual a sua expectativa de vendas de novos clientes pelos canais mensalmente?"
 ]
 
 @app.post("/chat")
@@ -164,9 +164,9 @@ def gerar_prompt(data):
     try:
         ticket = float(data["diagnostico"][7].replace("R$", "").replace(",", "").strip())
         ciclo = int(data["diagnostico"][8])
-        meta_mensal = float(data["diagnostico"][9].replace("R$", "").replace(",", "").strip())
+        novos_clientes = int(data["diagnostico"][9])
     except:
-        ticket = ciclo = meta_mensal = 0
+        ticket = ciclo = novos_clientes = 0
 
     return f"""
 Você é um consultor especialista em canais de vendas. Gere um diagnóstico estruturado com os seguintes tópicos:
@@ -188,13 +188,13 @@ Você é um consultor especialista em canais de vendas. Gere um diagnóstico est
 07) Faça um cálculo de retorno financeiro com 20 canais ativos, assumindo o ticket médio informado.
 
 Além disso, calcule:
-- Quantas oportunidades por canal são necessárias para atingir a meta mensal.
+- Quantas oportunidades por canal são necessárias para atingir a meta mensal de novos clientes.
 - Quantas prospecções são necessárias por canal com base no índice médio de conversão do setor da empresa (pesquise esse índice).
 
 Dados:
 - Ticket médio: R${ticket:,.2f}
 - Ciclo médio de vendas: {ciclo} dias
-- Meta mensal por canal: R${meta_mensal:,.2f}
+- Meta mensal de novos clientes por canal: {novos_clientes}
 
 Dados do diagnóstico:
 Nome: {data['nome']}
