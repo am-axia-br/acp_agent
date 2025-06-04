@@ -1,0 +1,27 @@
+TIPOS DE EMPRESAS POR SEGMENTO
+
+Exemplo de correspondência entre segmentos e tipos de empresas que podem atuar como canais:
+
+Tecnologia Educacional:
+- Escolas de idiomas
+- Franquias de cursos
+- Plataformas de ensino
+
+Agronegócio:
+- Cooperativas agrícolas
+- Revendas de insumos
+- Consultorias de campo
+
+Saúde:
+- Clínicas
+- Distribuidores hospitalares
+- Sistemas laboratoriais
+
+Varejo:
+- Lojas de sistemas PDV
+- Franquias de automação comercial
+
+Serviços Financeiros:
+- Contadores
+- Consultorias de BPO
+- Bancos digitais
