@@ -149,7 +149,7 @@ async def resetar_diagnostico():
     return {"status": "resetado"}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
     cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
     if cidades_df.shape[0] < 30:
