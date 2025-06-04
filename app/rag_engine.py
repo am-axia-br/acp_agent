@@ -26,7 +26,9 @@ def simular_populacao_pib(df_segmento):
     municipios = df_segmento["Municipio"].unique()
     populacoes = np.random.randint(30000, 1500000, size=len(municipios))
     pibs = np.round(np.random.uniform(0.5, 50.0, size=len(municipios)), 2)
-    perfil_canal = np.round(df_segmento.groupby("Municipio")["Unidades_Locais"].sum() * np.random.uniform(0.1, 0.5)).astype(int).values
+    perfil_canal = np.round(
+        df_segmento.groupby("Municipio")["Unidades_Locais"].sum() * np.random.uniform(0.1, 0.5)
+    ).astype(int).values
     return pd.DataFrame({
         "Municipio": municipios,
         "Populacao": populacoes,
@@ -38,7 +40,7 @@ def simular_populacao_pib(df_segmento):
 def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=None):
     """
     Filtra os municípios com maior potencial para o segmento informado.
-    Permite definir a ordem de classificação com o parâmetro ordenar_por.
+    Se houver menos de 30 resultados, completa com cidades genéricas.
     """
     if ordenar_por is None:
         ordenar_por = ["Empresas_Segmento", "Salario_Medio_R$"]
@@ -55,7 +57,21 @@ def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=
         dados_complementares = simular_populacao_pib(filtrado)
         salario_medio = filtrado.groupby("Municipio")["Salario_Medio_R$"].mean().reset_index()
         final_df = dados_complementares.merge(salario_medio, on="Municipio")
+
         final_df = final_df.sort_values(by=ordenar_por, ascending=False).reset_index(drop=True)
+
+        # Se menos de 30, preencher com genéricos
+        if len(final_df) < top_n:
+            faltam = top_n - len(final_df)
+            extras = pd.DataFrame({
+                "Municipio": [f"Município Genérico {i+1}" for i in range(faltam)],
+                "Populacao": np.random.randint(20000, 100000, size=faltam),
+                "PIB": np.round(np.random.uniform(0.3, 10.0, size=faltam), 2),
+                "Empresas_Segmento": np.random.randint(20, 100, size=faltam),
+                "Empresas_Perfil_Canal": np.random.randint(5, 50, size=faltam),
+                "Salario_Medio_R$": np.round(np.random.uniform(1800, 3500, size=faltam), 2)
+            })
+            final_df = pd.concat([final_df, extras], ignore_index=True)
 
         return final_df.head(top_n)
 
@@ -93,17 +109,28 @@ def gerar_tabela_html(dataframe):
 
     return f"""
     <div class='paragrafo'>
-    <h3 style='color:#5e17eb;'>📍 Top 30 Municípios com Maior Potencial para Canais</h3>
-    <table border='0' width='100%' style='font-size:15px; line-height:1.5; border-collapse:collapse;'>
-        <tr style='background:#f0f0f0;'>
-            <th align='left'>Município</th>
-            <th align='left'>População</th>
-            <th align='left'>PIB</th>
-            <th align='left'>Empresas no Segmento</th>
-            <th align='left'>Empresas com Perfil de Canal</th>
-            <th align='left'>Salário Médio (R$)</th>
-        </tr>
-        {linhas}
-    </table>
+        <h3 style='color:#5e17eb;'>📍 Top 30 Municípios com Maior Potencial para Canais</h3>
+        <table border='0' width='100%' style='font-size:15px; line-height:1.5; border-collapse:collapse; margin-top:15px;'>
+            <thead style='background:#f0f0f0;'>
+                <tr>
+                    <th align='left'>Município</th>
+                    <th align='left'>População</th>
+                    <th align='left'>PIB</th>
+                    <th align='left'>Empresas no Segmento</th>
+                    <th align='left'>Empresas com Perfil de Canal</th>
+                    <th align='left'>Salário Médio (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {linhas}
+            </tbody>
+        </table>
     </div>
     """
+
+def debug_dataframe(df_debug):
+    """
+    Imprime as 5 primeiras linhas do DataFrame para debug no terminal.
+    """
+    print("\n[RAG DEBUG] Visualização dos primeiros registros:")
+    print(df_debug.head())

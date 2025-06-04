@@ -11,7 +11,7 @@ import unicodedata
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
-from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html  # Integração cuidadosa
+from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -149,26 +149,33 @@ async def resetar_diagnostico():
     return {"status": "resetado"}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).strip()
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
-    cidades_df = filtrar_municipios_por_segmento(
-        segmento,
-        top_n=30,
-        ordenar_por=["Empresas_Segmento", "Salario_Medio_R$"]
-    )
+    cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
+    if cidades_df.shape[0] < 30:
+        faltando = 30 - cidades_df.shape[0]
+        cidades_fake = [f"CidadeGenérica{i+1}" for i in range(faltando)]
+        for cid in cidades_fake:
+            cidades_df.loc[len(cidades_df)] = [cid, 100000, 10.0, 500, 100, 3000.0]
     cidades_html = gerar_tabela_html(cidades_df)
     return f"""
 Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça um diagnóstico detalhado com os seguintes tópicos:
 
 1. Liste 5 modelos ideais de canais de vendas. Explique como cada modelo funciona, por que é ideal para o negócio e quais serviços agregados os canais podem oferecer.
+
 2. Liste 5 perfis ideais de empresas para serem canais/parceiros/aliados. Justifique cada perfil e relacione aos produtos e diferenciais do negócio.
+
 3. Liste exatamente 30 cidades brasileiras com maior potencial para abrir canais, com os seguintes dados por cidade:
    - Nome
    - População
    - PIB
    - Número de empresas no segmento da empresa
    - Número de empresas com perfil de canal
+
+{cidades_html}
+
 4. Projeção de faturamento com 20 canais ativos, assumindo ticket médio informado.
+
 5. Estratégia de apoio e recursos que a empresa pode oferecer aos parceiros (ex: marketing, treinamento, suporte).
 
 Nunca use asteriscos ou hashtags. Use apenas HTML limpo.
@@ -182,7 +189,6 @@ E-mail: {data['email']}
 Respostas:
 {blocos}
 """
-
 
 def limpar_unicode(texto_raw: str) -> str:
     texto_limpo = texto_raw.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
@@ -199,14 +205,13 @@ def chamar_llm(prompt):
             messages=[
                 {
                     "role": "system",
-                    "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante."
+                    "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante. Separe cada seção com exatamente duas linhas em branco."
                 },
                 {"role": "user", "content": prompt}
             ]
         )
         texto_original = resposta.choices[0].message.content
-        texto = remover_surrogates(limpar_unicode(texto_original.strip()))
-        texto = texto.replace("**", "")
+        texto = remover_surrogates(limpar_unicode(texto_original.strip())).replace("**", "")
 
         linhas_formatadas = []
         for linha in texto.split("\n"):
@@ -214,13 +219,13 @@ def chamar_llm(prompt):
             if not linha:
                 continue
             elif linha.lower().startswith("### "):
-                linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>")
+                linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>\n\n")
             elif linha.lower().startswith("## "):
-                linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>")
+                linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>\n\n")
             elif linha.lower().startswith("# "):
-                linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>")
+                linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>\n\n")
             else:
-                linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>")
+                linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>\n\n")
 
         html_formatado = "\n".join(linhas_formatadas)
         enviar_email(data, html_formatado)
@@ -230,3 +235,4 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
+
