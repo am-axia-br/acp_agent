@@ -20,17 +20,6 @@ app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.get("/")
-def home():
-    return FileResponse("static/index.html")
-
-@app.get("/chat")
-def chat_get():
-    return {"erro": "Método GET não permitido nesta rota. Use POST com corpo JSON contendo 'mensagem'."}
-
-class Mensagem(BaseModel):
-    mensagem: str
-
 data = {
     "nome": None,
     "empresa": None,
@@ -42,6 +31,29 @@ data = {
     "iniciado": False,
     "prompt": None
 }
+
+@app.get("/")
+def home():
+    global data
+    data = {
+        "nome": None,
+        "empresa": None,
+        "whatsapp": None,
+        "email": None,
+        "diagnostico": [],
+        "etapa_atual": 0,
+        "finalizado": False,
+        "iniciado": False,
+        "prompt": None
+    }
+    return FileResponse("static/index.html")
+
+@app.get("/chat")
+def chat_get():
+    return {"erro": "Método GET não permitido nesta rota. Use POST com corpo JSON contendo 'mensagem'."}
+
+class Mensagem(BaseModel):
+    mensagem: str
 
 perguntas = [
     "Qual o site da empresa?",
@@ -96,7 +108,11 @@ async def chat(req: Request):
                 data["finalizado"] = True
                 return {"mensagem": "Analisando as respostas e preparando o seu diagnóstico...", "loading": True}
             except Exception as e:
-                return {"mensagem": "Ocorreu um erro ao preparar o diagnóstico.", "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
+                return {
+                    "mensagem": "Ocorreu um erro ao preparar o diagnóstico.",
+                    "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
+                    "email": data["email"]
+                }
 
     return {"mensagem": "Diagnóstico já concluído."}
 
@@ -104,20 +120,42 @@ async def chat(req: Request):
 async def gerar_diagnostico():
     try:
         resposta = chamar_llm(data["prompt"])
-        return {"mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:", "resumo": resposta, "email": data["email"]}
+        return {
+            "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
+            "resumo": resposta,
+            "email": data["email"]
+        }
     except Exception as e:
-        return {"mensagem": "Ocorreu um erro ao gerar o diagnóstico.", "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
+        return {
+            "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
+            "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
+            "email": data["email"]
+        }
 
 @app.post("/reset")
 async def resetar_diagnostico():
     global data
-    data = {"nome": None, "empresa": None, "whatsapp": None, "email": None, "diagnostico": [], "etapa_atual": 0, "finalizado": False, "iniciado": False, "prompt": None}
+    data = {
+        "nome": None,
+        "empresa": None,
+        "whatsapp": None,
+        "email": None,
+        "diagnostico": [],
+        "etapa_atual": 0,
+        "finalizado": False,
+        "iniciado": False,
+        "prompt": None
+    }
     return {"status": "resetado"}
 
 def gerar_prompt(data):
     blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
-    cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
+    cidades_df = filtrar_municipios_por_segmento(
+        segmento,
+        top_n=30,
+        ordenar_por=["Empresas_Segmento", "Salario_Medio_R$"]
+    )
     cidades_html = gerar_tabela_html(cidades_df)
     return f"""
 Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça um diagnóstico detalhado com os seguintes tópicos:
@@ -145,6 +183,7 @@ Respostas:
 {blocos}
 """
 
+
 def limpar_unicode(texto_raw: str) -> str:
     texto_limpo = texto_raw.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
     texto_utf8 = texto_limpo.encode("utf-8", "replace").decode("utf-8", "replace")
@@ -158,7 +197,10 @@ def chamar_llm(prompt):
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante."},
+                {
+                    "role": "system",
+                    "content": "Você é um consultor especialista em canais de vendas com acesso a uma base real de dados sobre cidades brasileiras. Use sempre dados plausíveis e consistentes, formatados em HTML limpo, espaçado e sem asteriscos ou hashtags. Use <h2>, <h3>, <p> e espaçamento visual elegante."
+                },
                 {"role": "user", "content": prompt}
             ]
         )
@@ -188,5 +230,3 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
-
-
