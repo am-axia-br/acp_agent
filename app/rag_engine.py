@@ -21,20 +21,31 @@ df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".",
 df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
 df["Salario_Medio_R$"] = pd.to_numeric(df["Salario_Medio_R$"], errors="coerce")
 
-# Simulação de população e PIB
+# Simulação de população, PIB e salário
 def simular_populacao_pib(df_segmento):
     municipios = df_segmento["Municipio"].unique()
-    populacoes = np.random.randint(30000, 1500000, size=len(municipios))
-    pibs = np.round(np.random.uniform(0.5, 50.0, size=len(municipios)), 2)
-    perfil_canal = np.round(
-        df_segmento.groupby("Municipio")["Unidades_Locais"].sum() * np.random.uniform(0.1, 0.5)
-    ).astype(int).values
+    empresas = df_segmento.groupby("Municipio")["Unidades_Locais"].sum().values
+
+    # População proporcional ao número de empresas (até 20 milhões)
+    populacoes = np.clip(np.round(empresas * np.random.uniform(15, 60)).astype(int), 1000, 20_000_000)
+
+    # PIB proporcional ao número de empresas (até 200 bi)
+    pibs = np.clip(np.round(empresas * np.random.uniform(0.02, 0.08), 2), 0.3, 200.0)
+
+    # Perfil de canal baseado em fração das empresas
+    perfil_canal = np.round(empresas * np.random.uniform(0.1, 0.5)).astype(int)
+
+    # Salário médio com variação realista
+    media_salarial_base = df_segmento.groupby("Municipio")["Salario_Medio_R$"].mean().values
+    salarios = np.clip(np.round(media_salarial_base * np.random.uniform(0.85, 1.25), 2), 1500.0, 15000.0)
+
     return pd.DataFrame({
         "Municipio": municipios,
         "Populacao": populacoes,
         "PIB": pibs,
-        "Empresas_Segmento": df_segmento.groupby("Municipio")["Unidades_Locais"].sum().values,
-        "Empresas_Perfil_Canal": perfil_canal
+        "Empresas_Segmento": empresas,
+        "Empresas_Perfil_Canal": perfil_canal,
+        "Salario_Medio_R$": salarios
     })
 
 def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=None):
@@ -55,17 +66,14 @@ def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=
             ])
 
         dados_complementares = simular_populacao_pib(filtrado)
-        salario_medio = filtrado.groupby("Municipio")["Salario_Medio_R$"].mean().reset_index()
-        final_df = dados_complementares.merge(salario_medio, on="Municipio")
-
-        final_df = final_df.sort_values(by=ordenar_por, ascending=False).reset_index(drop=True)
+        final_df = dados_complementares.sort_values(by=ordenar_por, ascending=False).reset_index(drop=True)
 
         # Se menos de 30, preencher com genéricos
         if len(final_df) < top_n:
             faltam = top_n - len(final_df)
             extras = pd.DataFrame({
                 "Municipio": [f"Município Genérico {i+1}" for i in range(faltam)],
-                "Populacao": np.random.randint(20000, 100000, size=faltam),
+                "Populacao": np.random.randint(1000, 20000000, size=faltam),
                 "PIB": np.round(np.random.uniform(0.3, 10.0, size=faltam), 2),
                 "Empresas_Segmento": np.random.randint(20, 100, size=faltam),
                 "Empresas_Perfil_Canal": np.random.randint(5, 50, size=faltam),

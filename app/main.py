@@ -63,7 +63,9 @@ perguntas = [
     "Quais os seus diferenciais?",
     "Quais os produtos e serviços vendidos?",
     "Qual o modelo de negócio da empresa? Comercializa licenças? Cobra mensalidade? Cobra projeto?",
-    "Qual o ticket médio dos negócios?"
+    "Qual o ticket médio dos negócios?",
+    "Qual o ciclo médio de vendas (em dias)?",
+    "Qual a meta mensal de vendas esperada por canal (em R$)?"
 ]
 
 @app.post("/chat")
@@ -149,7 +151,7 @@ async def resetar_diagnostico():
     return {"status": "resetado"}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).strip()
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
     cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
     if cidades_df.shape[0] < 30:
@@ -158,27 +160,41 @@ def gerar_prompt(data):
         for cid in cidades_fake:
             cidades_df.loc[len(cidades_df)] = [cid, 100000, 10.0, 500, 100, 3000.0]
     cidades_html = gerar_tabela_html(cidades_df)
+
+    try:
+        ticket = float(data["diagnostico"][7].replace("R$", "").replace(",", "").strip())
+        ciclo = int(data["diagnostico"][8])
+        meta_mensal = float(data["diagnostico"][9].replace("R$", "").replace(",", "").strip())
+    except:
+        ticket = ciclo = meta_mensal = 0
+
     return f"""
-Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça um diagnóstico detalhado com os seguintes tópicos:
+Você é um consultor especialista em canais de vendas. Gere um diagnóstico estruturado com os seguintes tópicos:
 
-1. Liste 5 modelos ideais de canais de vendas. Explique como cada modelo funciona, por que é ideal para o negócio e quais serviços agregados os canais podem oferecer.
+01) Resumo sobre a empresa. Pesquise no site informado e use dados disponíveis na internet.
 
-2. Liste 5 perfis ideais de empresas para serem canais/parceiros/aliados. Justifique cada perfil e relacione aos produtos e diferenciais do negócio.
+02) Situação do mercado e perfil dos clientes que essa empresa atende.
 
-3. Liste exatamente 30 cidades brasileiras com maior potencial para abrir canais, com os seguintes dados por cidade:
-   - Nome
-   - População
-   - PIB
-   - Número de empresas no segmento da empresa
-   - Número de empresas com perfil de canal
+03) Oportunidades de crescimento e expansão da empresa com canais de vendas.
+
+04) Liste 5 modelos ideais de canais de vendas com explicações de funcionamento, vantagens e serviços agregados.
+
+05) Descreva os perfis ideais de empresas que podem se tornar canais de vendas.
+
+06) Liste 30 cidades com maior potencial para abertura de canais (dados: nome, população, PIB, empresas no segmento, empresas com perfil de canal, salário médio). Se o RAG não retornar 30, complemente com sugestões próprias.
 
 {cidades_html}
 
-4. Projeção de faturamento com 20 canais ativos, assumindo ticket médio informado.
+07) Faça um cálculo de retorno financeiro com 20 canais ativos, assumindo o ticket médio informado.
 
-5. Estratégia de apoio e recursos que a empresa pode oferecer aos parceiros (ex: marketing, treinamento, suporte).
+Além disso, calcule:
+- Quantas oportunidades por canal são necessárias para atingir a meta mensal.
+- Quantas prospecções são necessárias por canal com base no índice médio de conversão do setor da empresa (pesquise esse índice).
 
-Nunca use asteriscos ou hashtags. Use apenas HTML limpo.
+Dados:
+- Ticket médio: R${ticket:,.2f}
+- Ciclo médio de vendas: {ciclo} dias
+- Meta mensal por canal: R${meta_mensal:,.2f}
 
 Dados do diagnóstico:
 Nome: {data['nome']}
@@ -235,4 +251,3 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
-
