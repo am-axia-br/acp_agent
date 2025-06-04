@@ -8,12 +8,12 @@ from pathlib import Path
 import pandas as pd
 import os
 
-BASE_DIR = "app/conhecimento_canais/"
+# Corrigido: agora aponta direto para a raiz 'app/'
+BASE_DIR = "app/"
 ARQUIVO_EXCEL = os.path.join(BASE_DIR, "conhecimento_canais_completo.xlsx")
-INDEX_DIR = "app/vectorstore_canais/"
+INDEX_DIR = os.path.join(BASE_DIR, "vectorstore_canais/")
 
-# Garante que os diretórios existem
-os.makedirs(BASE_DIR, exist_ok=True)
+# Garante apenas o diretório do índice
 os.makedirs(INDEX_DIR, exist_ok=True)
 
 def carregar_documentos():
