@@ -4,42 +4,48 @@ logger = get_logger(__name__)
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.docstore.document import Document
-
 from pathlib import Path
-import os
 import pandas as pd
+import os
 
 BASE_DIR = "app/conhecimento_canais/"
-INDEX_DIR = "app/vectorstore_canais/"
 ARQUIVO_EXCEL = os.path.join(BASE_DIR, "conhecimento_canais_completo.xlsx")
+INDEX_DIR = "app/vectorstore_canais/"
 
 # Garante que os diretórios existem
 os.makedirs(BASE_DIR, exist_ok=True)
 os.makedirs(INDEX_DIR, exist_ok=True)
 
 def carregar_documentos():
-    """Carrega os dados da planilha Excel como documentos do LangChain."""
+    """Carrega todas as abas da planilha Excel como documentos."""
     if not os.path.exists(ARQUIVO_EXCEL):
         raise FileNotFoundError(f"Arquivo Excel não encontrado em: {ARQUIVO_EXCEL}")
 
-    df_dict = pd.read_excel(ARQUIVO_EXCEL, sheet_name=None)  # Lê todas as abas
+    logger.info("Lendo planilha Excel com abas de conhecimento...")
+    df_dict = pd.read_excel(ARQUIVO_EXCEL, sheet_name=None)
     documentos = []
 
     for aba, df in df_dict.items():
-        if df.empty or df.shape[1] == 0:
-            continue
-        conteudo = "\n".join(str(val) for val in df.iloc[:, 0].dropna())  # Assume coluna A
-        documentos.append(Document(page_content=conteudo, metadata={"fonte": aba}))
+        for _, row in df.iterrows():
+            linha = " ".join(str(val) for val in row if pd.notna(val))
+            if linha.strip():
+                documentos.append({"content": linha, "source": aba})
 
+    logger.info(f"Total de linhas lidas: {len(documentos)}")
     return documentos
 
 def indexar_documentos():
-    """Cria o índice vetorial FAISS com embeddings da OpenAI a partir da planilha."""
+    """Cria o índice vetorial FAISS com embeddings da OpenAI a partir do Excel."""
     try:
-        documentos = carregar_documentos()
-        if not documentos:
-            raise ValueError("Nenhum conteúdo foi carregado da planilha Excel.")
+        dados = carregar_documentos()
+        if not dados:
+            raise ValueError("Nenhum conteúdo válido foi encontrado no Excel.")
+
+        docs = [d["content"] for d in dados]
+        metadados = ["Origem: " + d["source"] for d in dados]
+
+        from langchain.schema import Document
+        documentos = [Document(page_content=doc, metadata={"source": meta}) for doc, meta in zip(docs, metadados)]
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         chunks = splitter.split_documents(documentos)
@@ -48,8 +54,10 @@ def indexar_documentos():
         vectorstore = FAISS.from_documents(chunks, embeddings)
         vectorstore.save_local(INDEX_DIR)
 
+        logger.info(f"Indexação concluída com {len(documentos)} documentos e {len(chunks)} chunks.")
         return len(documentos)
     except Exception as e:
+        logger.error(f"Erro ao indexar documentos: {e}")
         raise RuntimeError(f"Erro ao indexar documentos: {e}")
 
 def carregar_index():
@@ -67,7 +75,7 @@ def buscar_conhecimento(pergunta: str, k=3) -> str:
 # Teste local
 if __name__ == "__main__":
     qtd = indexar_documentos()
-    print(f"✅ {qtd} abas da planilha foram indexadas com sucesso.")
-    resultado = buscar_conhecimento("Qual o melhor modelo de canal para produto complexo?")
+    print(f"✅ {qtd} registros indexados com sucesso.")
+    resultado = buscar_conhecimento("Quais os modelos ideais de canais?")
     print("\n📌 RESPOSTA:\n", resultado)
 
