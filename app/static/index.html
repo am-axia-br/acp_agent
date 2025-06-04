@@ -29,7 +29,7 @@
     h2 {
       text-align: center;
       color: #7b2cbf;
-      margin: 10px 30px;
+      margin: 10px 30px 30px;
       font-size: 20px;
       line-height: 1.6;
       white-space: pre-line;
@@ -158,7 +158,7 @@
     @media (max-width: 600px) {
       h2 {
         font-size: 16px;
-        margin: 10px 15px;
+        margin: 10px 15px 20px;
       }
       #mensagem {
         width: 90%;
@@ -168,12 +168,125 @@
 </head>
 <body>
   <img src="/static/AC%20Partners%20Gradient.png" alt="AC Partners" class="logo">
-<h2 style="margin-bottom: 30px;">
-  Olá... Eu sou a AcIA, uma IA especialista em Canais de Vendas<br>
-  e vou te ajudar a montar uma estratégia comercial focada em alianças, parcerias e canais de vendas.<br>
-  Vamos começar nossa conversa? Comece me falando de onde você fala...
-</h2>
 
+  <h2>
+    Olá... Eu sou a AcIA, uma IA especialista em Canais de Vendas<br>
+    e vou te ajudar a montar uma estratégia comercial focada em alianças, parcerias e canais de vendas.<br>
+    Vamos começar nossa conversa? Comece me falando de onde você fala...
+  </h2>
+
+  <form id="chat-form">
+    <input type="text" id="mensagem" required>
+    <button type="submit">Enviar</button>
+  </form>
+
+  <button id="resetar" onclick="reiniciarConversa()">🔄 Reiniciar Diagnóstico</button>
+
+  <div id="mensagens"></div>
+  <pre id="resposta"></pre>
+
+  <div id="carregando">
+    <p>Analisando as respostas e preparando o seu diagnóstico...</p>
+    <div id="barra-progresso"><div id="barra"></div></div>
+  </div>
+
+  <div id="finalizacao">
+    <h3>Resumo do Diagnóstico</h3>
+    <div id="resumoDiagnostico"></div>
+    <div id="cidades"></div>
+    <p style="margin-top: 20px;">Deseja enviar o diagnóstico para: <strong id="emailFinal"></strong>?</p>
+    <button onclick="enviarEmailFinal()">📤 Enviar Diagnóstico</button>
+  </div>
+
+  <footer>
+    © AC Partners – Conectar Expande!
+  </footer>
+
+  <script>
+    const mensagens = document.getElementById("mensagens");
+    const respostaArea = document.getElementById("resposta");
+    const finalizacao = document.getElementById("finalizacao");
+    const resumoDiagnostico = document.getElementById("resumoDiagnostico");
+    const emailFinal = document.getElementById("emailFinal");
+    const carregando = document.getElementById("carregando");
+    const barra = document.getElementById("barra");
+    const inputMensagem = document.getElementById("mensagem");
+    const cidadesDiv = document.getElementById("cidades");
+
+    let progresso = 0;
+    let intervalo;
+
+    document.getElementById("chat-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const mensagem = inputMensagem.value;
+
+      const divUser = document.createElement("div");
+      divUser.className = "mensagem usuario";
+      divUser.textContent = "Você: " + mensagem;
+      mensagens.appendChild(divUser);
+      mensagens.style.display = 'block';
+
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mensagem })
+        });
+
+        const data = await response.json();
+
+        if (data.loading) {
+          document.getElementById("chat-form").style.display = 'none';
+          mensagens.style.display = 'none';
+          carregando.style.display = 'block';
+          progresso = 0;
+          barra.style.width = '0%';
+
+          intervalo = setInterval(() => {
+            progresso += 0.5;
+            barra.style.width = progresso + '%';
+            if (progresso >= 100) clearInterval(intervalo);
+          }, 100);
+
+          const respostaFinal = await fetch("/gerar-diagnostico", { method: "POST" });
+          const finalData = await respostaFinal.json();
+
+          clearInterval(intervalo);
+          carregando.style.display = 'none';
+          finalizacao.style.display = 'block';
+
+          const textoCompleto = finalData.resumo;
+          const partes = textoCompleto.split("\n\n");
+
+          resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${partes[0]}</div>`;
+
+          if (partes.length > 1) {
+            cidadesDiv.style.display = 'block';
+            cidadesDiv.innerHTML = `<h4>📍 Cidades com Potencial</h4><br>${partes.slice(1).join("<br><br>")}`;
+          }
+
+          emailFinal.textContent = finalData?.email || 'seu e-mail';
+          return;
+        }
+
+        const textoIa = data.pergunta || data.mensagem || JSON.stringify(data);
+
+        if (textoIa.includes("Qual o seu WhatsApp")) {
+          inputMensagem.placeholder = "Ex: DDD9XXXXYYYY";
+        } else {
+          inputMensagem.placeholder = "";
+        }
+
+        const divIa = document.createElement("div");
+        divIa.className = "mensagem ia";
+        divIa.textContent = textoIa;
+        mensagens.appendChild(divIa);
+        mensagens.scrollTop = mensagens.scrollHeight;
+
+        respostaArea.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        alert("Erro ao conectar com o servidor.");
+      }
 
       inputMensagem.value = "";
       inputMensagem.focus();
