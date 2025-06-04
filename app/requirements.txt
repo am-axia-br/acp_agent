@@ -6,3 +6,5 @@ pandas
 openpyxl
 numpy
 langchain
+langchain-community
+
