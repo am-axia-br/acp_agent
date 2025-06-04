@@ -151,7 +151,7 @@ async def resetar_diagnostico():
     return {"status": "resetado"}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
     cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
     if cidades_df.shape[0] < 30:
@@ -183,6 +183,7 @@ Você é um consultor especialista em canais de vendas. Gere um diagnóstico est
 
 06) Liste 30 cidades com maior potencial para abertura de canais (dados: nome, população, PIB, empresas no segmento, empresas com perfil de canal, salário médio). Se o RAG não retornar 30, complemente com sugestões próprias.
 
+<h3 style='color:#5e17eb;margin-top:30px;'>📍 Cidades com Potencial</h3>
 {cidades_html}
 
 07) Faça um cálculo de retorno financeiro com 20 canais ativos, assumindo o ticket médio informado.
@@ -235,15 +236,18 @@ def chamar_llm(prompt):
             if not linha:
                 continue
             elif linha.lower().startswith("### "):
-                linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>\n\n")
+                linhas_formatadas.append(f"<h2 style='color:#5e17eb;margin-top:30px;'>{linha[4:]}</h2>")
             elif linha.lower().startswith("## "):
-                linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>\n\n")
+                linhas_formatadas.append(f"<h3 style='color:#a638ec;margin-top:20px;'>{linha[3:]}</h3>")
             elif linha.lower().startswith("# "):
-                linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>\n\n")
+                linhas_formatadas.append(f"<h4 style='color:#fc6736;margin-top:15px;'>{linha[2:]}</h4>")
             else:
-                linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>\n\n")
+                linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>")
 
         html_formatado = "\n".join(linhas_formatadas)
+
+        html_formatado = re.sub(r"(\n\s*){3,}", "\n\n", html_formatado)
+
         enviar_email(data, html_formatado)
         return html_formatado
 
@@ -251,3 +255,4 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
+
