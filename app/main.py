@@ -115,19 +115,25 @@ async def resetar_diagnostico():
     return {"status": "resetado"}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])]).
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
-    cidades_df = filtrar_municipios_por_segmento(segmento)
+    cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
     cidades_html = gerar_tabela_html(cidades_df)
     return f"""
 Você é um especialista em canais de vendas no Brasil. Com base nas informações abaixo, analise o perfil da empresa respondente e forneça um diagnóstico detalhado com os seguintes tópicos:
 
-1. Sugestões de modelos ideais de canais de vendas.
-2. Perfis ideais de empresas para parceria, canal ou alianças.
-3. Considerando os dados reais do IBGE, analise as cidades listadas e indique por que elas são estratégicas para a empresa {data['empresa']}. Base:
-{cidades_html}
-4. Projeção de faturamento com 20 canais ativos.
-5. Tipos de apoio e recursos que a empresa pode oferecer aos parceiros.
+1. Liste 5 modelos ideais de canais de vendas. Explique como cada modelo funciona, por que é ideal para o negócio e quais serviços agregados os canais podem oferecer.
+2. Liste 5 perfis ideais de empresas para serem canais/parceiros/aliados. Justifique cada perfil e relacione aos produtos e diferenciais do negócio.
+3. Liste exatamente 30 cidades brasileiras com maior potencial para abrir canais, com os seguintes dados por cidade:
+   - Nome
+   - População
+   - PIB
+   - Número de empresas no segmento da empresa
+   - Número de empresas com perfil de canal
+4. Projeção de faturamento com 20 canais ativos, assumindo ticket médio informado.
+5. Estratégia de apoio e recursos que a empresa pode oferecer aos parceiros (ex: marketing, treinamento, suporte).
+
+Nunca use asteriscos ou hashtags. Use apenas HTML limpo.
 
 Dados do diagnóstico:
 Nome: {data['nome']}
@@ -158,6 +164,7 @@ def chamar_llm(prompt):
         )
         texto_original = resposta.choices[0].message.content
         texto = remover_surrogates(limpar_unicode(texto_original.strip()))
+        texto = texto.replace("**", "")
 
         linhas_formatadas = []
         for linha in texto.split("\n"):
@@ -181,4 +188,5 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
+
 
