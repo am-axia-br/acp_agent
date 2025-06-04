@@ -12,12 +12,12 @@ from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
 from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html
+from rag_parcerias import buscar_conhecimento  # <- RAG de parcerias
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 data = {
@@ -168,8 +168,14 @@ def gerar_prompt(data):
     except:
         ticket = ciclo = novos_clientes = 0
 
+    # RAG de conhecimento de parcerias
+    conhecimento_parcerias = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
+    conhecimento_formatado = f"\n### Base de Conhecimento sobre Parcerias:\n\n{conhecimento_parcerias}\n\n"
+
     return f"""
-Você é um consultor especialista em canais de vendas. Gere um diagnóstico estruturado com os seguintes tópicos:
+Você é um consultor especialista em canais de vendas. Use os dados do cliente e o conhecimento abaixo para gerar um diagnóstico estruturado com os seguintes tópicos:
+
+{conhecimento_formatado}
 
 01) Resumo sobre a empresa. Pesquise no site informado e use dados disponíveis na internet.
 
@@ -245,7 +251,6 @@ def chamar_llm(prompt):
                 linhas_formatadas.append(f"<p style='margin-bottom:15px'>{linha}</p>")
 
         html_formatado = "\n".join(linhas_formatadas)
-
         html_formatado = re.sub(r"(\n\s*){3,}", "\n\n", html_formatado)
 
         enviar_email(data, html_formatado)
@@ -255,4 +260,17 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
+@app.post("/reindexar-rag")
+async def reindexar_rag():
+    try:
+        from rag_parcerias import indexar_documentos
+        total = indexar_documentos()
+        return {"status": "ok", "arquivos_indexados": total}
+    except Exception as e:
+        return {
+            "status": "erro",
+            "mensagem": str(e),
+            "detalhes": traceback.format_exc()
+        }
+
 
