@@ -78,4 +78,3 @@ if __name__ == "__main__":
     print(f"✅ {qtd} registros indexados com sucesso.")
     resultado = buscar_conhecimento("Quais os modelos ideais de canais?")
     print("\n📌 RESPOSTA:\n", resultado)
-
