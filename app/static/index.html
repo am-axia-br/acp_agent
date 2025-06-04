@@ -5,6 +5,10 @@
   <title>Agente ACP – Conectar Expande!</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
+    * {
+      transition: all 0.2s ease-in-out;
+    }
+
     body {
       font-family: 'Inter', sans-serif;
       background: linear-gradient(to bottom, #fdfbfb, #ebedee);
@@ -25,7 +29,9 @@
     h2 {
       text-align: center;
       color: #7b2cbf;
-      margin: 10px 0;
+      margin: 10px 30px;
+      font-size: 20px;
+      line-height: 1.6;
     }
 
     #chat-form {
@@ -39,6 +45,11 @@
       border: 1px solid #ccc;
       border-radius: 8px;
       font-size: 16px;
+    }
+
+    #mensagem::placeholder {
+      color: #999;
+      font-style: italic;
     }
 
     button {
@@ -141,7 +152,7 @@
 </head>
 <body>
   <img src="/static/AC%20Partners%20Gradient.png" alt="AC Partners" class="logo">
-  <h2>Converse com o Agente ACP</h2>
+  <h2>Olá... Eu sou a AcIA, uma IA especialista em Canais de Vendas e vou te ajudar a montar uma estratégia comercial focada em alianças, parcerias e canais de vendas. Vamos começar nossa conversa? Comece me falando de onde você fala...</h2>
 
   <form id="chat-form">
     <input type="text" id="mensagem" required>

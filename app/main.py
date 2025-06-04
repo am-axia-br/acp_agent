@@ -7,6 +7,7 @@ import os
 import openai
 import traceback
 import json
+import unicodedata
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
@@ -60,7 +61,7 @@ async def chat(req: Request):
 
     if not data["iniciado"]:
         data["iniciado"] = True
-        return {"mensagem": "Olá... Eu sou uma IA especialista em canais de vendas... Me fale o seu nome..."}
+        return {"mensagem": "Olá... Para começarmos o diagnóstico, me fale o seu nome..."}
 
     if not data["nome"]:
         data["nome"] = msg
@@ -114,7 +115,7 @@ async def resetar_diagnostico():
     return {"status": "resetado"}
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])] )
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
     cidades_df = filtrar_municipios_por_segmento(segmento)
     cidades_html = gerar_tabela_html(cidades_df)
@@ -138,6 +139,11 @@ Respostas:
 {blocos}
 """
 
+def limpar_unicode(texto_raw: str) -> str:
+    texto_limpo = texto_raw.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
+    texto_utf8 = texto_limpo.encode("utf-8", "replace").decode("utf-8", "replace")
+    return unicodedata.normalize("NFC", texto_utf8)
+
 def chamar_llm(prompt):
     try:
         resposta = client.chat.completions.create(
@@ -147,11 +153,8 @@ def chamar_llm(prompt):
                 {"role": "user", "content": prompt}
             ]
         )
-        texto = resposta.choices[0].message.content.strip()
-
-        # ✅ Correção definitiva de caracteres inválidos UTF-8/surrogate pairs
-        texto = texto.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
-        texto = texto.encode("utf-8", "replace").decode("utf-8", "replace")
+        texto_original = resposta.choices[0].message.content
+        texto = limpar_unicode(texto_original.strip())
 
         linhas_formatadas = []
         for linha in texto.split("\n"):
@@ -175,5 +178,3 @@ def chamar_llm(prompt):
         return f"Erro de codificação ao gerar sugestão: {str(e)}"
     except Exception as e:
         return f"Erro inesperado ao chamar LLM: {str(e)}"
-
-
