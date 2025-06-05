@@ -44,22 +44,37 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
-def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=None):
+def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, ordenar_por=None):
     if ordenar_por is None:
         ordenar_por = ["Empresas_Segmento", "Salario_Medio_R$"]
 
-    try:
-        filtrado = df[df["Descricao_CNAE"].astype(str).str.contains(segmento, case=False, na=False)]
+    segmentos_lista = [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
 
-        if filtrado.empty:
-            logger.warning(f"Segmento '{segmento}' nao encontrado no RAG. Retornando vazio.")
+    logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
+    
+    try:
+        filtrados = pd.DataFrame()
+
+        for termo in segmentos_lista:
+            encontrados = df[df["Descricao_CNAE"].astype(str).str.contains(termo, case=False, na=False)]
+            if not encontrados.empty:
+                filtrados = pd.concat([filtrados, encontrados])
+            else:
+                logger.warning(f"Segmento '{termo}' nao encontrado no RAG.")
+
+        if filtrados.empty:
             return pd.DataFrame(columns=[
                 "Municipio", "Populacao", "PIB",
                 "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"
             ])
 
-        dados_complementares = simular_populacao_pib(filtrado)
-        final_df = dados_complementares.sort_values(by=ordenar_por, ascending=False).reset_index(drop=True)
+        dados_complementares = simular_populacao_pib(filtrados)
+        final_df = dados_complementares.groupby("Municipio").sum(numeric_only=True).reset_index()
+
+        if "Salario_Medio_R$" not in final_df:
+            final_df["Salario_Medio_R$"] = np.random.uniform(2000, 8000, size=len(final_df))
+
+        final_df = final_df.sort_values(by=ordenar_por, ascending=False).reset_index(drop=True)
 
         if len(final_df) < top_n:
             faltam = top_n - len(final_df)
@@ -76,7 +91,7 @@ def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=
         return final_df.head(top_n)
 
     except Exception as e:
-        logger.error(f"Erro ao filtrar segmento '{segmento}': {e}")
+        logger.error(f"Erro ao processar segmentos '{segmentos}': {e}")
         return pd.DataFrame(columns=[
             "Municipio", "Populacao", "PIB",
             "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"

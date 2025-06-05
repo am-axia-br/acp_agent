@@ -12,7 +12,7 @@ import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
-from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html
+from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html, normalizar_segmentos
 from rag_parcerias import buscar_conhecimento
 
 load_dotenv()
@@ -161,7 +161,8 @@ async def reindexar_rag():
 def gerar_prompt(data):
     nome = data["nome"]
     empresa = data["empresa"]
-    segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
+    segmento_original = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
+    segmentos_normalizados = normalizar_segmentos(segmento_original)
 
     bloco_respostas = ""
     for i, resp in enumerate(data["diagnostico"]):
@@ -171,7 +172,7 @@ def gerar_prompt(data):
     conhecimento_perfis = buscar_conhecimento("perfis e tipos ideais de canais de vendas")
     conhecimento_servicos = buscar_conhecimento("servicos agregados em canais de vendas")
 
-    cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
+    cidades_df = filtrar_municipios_por_segmento(segmentos_normalizados, top_n=30)
     if cidades_df.shape[0] < 30:
         faltando = 30 - cidades_df.shape[0]
         cidades_fake = [f"CidadeGenerica{i+1}" for i in range(faltando)]
