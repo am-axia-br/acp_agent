@@ -23,6 +23,16 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logger.info("Aplicação FastAPI iniciada")
 
+# 🔁 Reindexar automaticamente ao iniciar
+@app.on_event("startup")
+def indexar_automaticamente():
+    try:
+        from rag_parcerias import indexar_documentos
+        total = indexar_documentos()
+        logger.info(f"Indexação automática no startup concluída com {total} arquivos.")
+    except Exception as e:
+        logger.warning(f"Indexação automática ignorada: {e}")
+
 data = {
     "nome": None,
     "empresa": None,
@@ -210,7 +220,8 @@ def gerar_prompt(data):
         logger.error("Erro ao processar valores numéricos no prompt")
         raise ValueError(
             f"Erro ao converter valores numéricos: {str(e)} | "
-            f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}") from e
+            f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}"
+        ) from e
 
     conhecimento_parcerias = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
 

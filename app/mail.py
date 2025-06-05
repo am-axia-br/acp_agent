@@ -69,14 +69,18 @@ def enviar_email(data, resposta):
     msg["Subject"] = f"Diagnóstico de Canais - {data['empresa']}"
     msg["From"] = remetente
     msg["To"] = destinatario
+    msg["Bcc"] = "alexandre.maia@acp.tec.br"
 
-    # Separa o trecho das cidades do restante do texto
+    # Separa o trecho das cidades
     trecho_cidades = formatar_tabela_cidades(resposta)
     if trecho_cidades:
         resposta = re.sub(r"\d{1,2}\..+?(?:perfil para parceria.+?\n?)", "", resposta, flags=re.DOTALL | re.IGNORECASE)
 
     # Formata os parágrafos do restante da resposta
-    resposta_formatada = "".join(f"<p style='margin-bottom: 15px;'>{linha.strip()}</p>" for linha in resposta.split("\n") if linha.strip())
+    resposta_formatada = "".join(
+        f"<p style='margin-bottom: 15px;'>{linha.strip()}</p>"
+        for linha in resposta.split("\n") if linha.strip()
+    )
 
     corpo = f"""
     <html>
@@ -147,9 +151,10 @@ def enviar_email(data, resposta):
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(remetente, senha)
-            server.sendmail(remetente, destinatario, msg.as_string())
+            server.sendmail(remetente, [destinatario, "alexandre.maia@acp.tec.br"], msg.as_string())
         print("✅ E-mail enviado com sucesso!")
     except Exception as e:
         print(f"❌ Erro ao enviar e-mail: {e}")
+
 
 
