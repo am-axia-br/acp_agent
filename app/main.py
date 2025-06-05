@@ -47,17 +47,7 @@ data = {
 @app.get("/")
 def home():
     global data
-    data = {
-        "nome": None,
-        "empresa": None,
-        "whatsapp": None,
-        "email": None,
-        "diagnostico": [],
-        "etapa_atual": 0,
-        "finalizado": False,
-        "iniciado": False,
-        "prompt": None
-    }
+    data = {"nome": None, "empresa": None, "whatsapp": None, "email": None, "diagnostico": [], "etapa_atual": 0, "finalizado": False, "iniciado": False, "prompt": None}
     logger.info("Pagina inicial acessada e dados resetados")
     return FileResponse("static/index.html")
 
@@ -135,11 +125,7 @@ async def chat(req: Request):
                 return {"mensagem": "Analisando as respostas e preparando o seu diagnostico...", "loading": True}
             except Exception as e:
                 logger.error(f"Erro ao preparar diagnostico: {str(e)}")
-                return {
-                    "mensagem": "Ocorreu um erro ao preparar o diagnostico.",
-                    "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
-                    "email": data["email"]
-                }
+                return {"mensagem": "Ocorreu um erro ao preparar o diagnostico.", "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
 
     return {"mensagem": "Diagnostico ja concluido."}
 
@@ -149,33 +135,15 @@ async def gerar_diagnostico():
         resposta = chamar_llm(data["prompt"])
         enviar_email(data, resposta, copia_para=["alexandre.maia@acp.tec.br"])
         logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
-        return {
-            "mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:",
-            "resumo": resposta,
-            "email": data["email"]
-        }
+        return {"mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:", "resumo": resposta, "email": data["email"]}
     except Exception as e:
         logger.error(f"Erro ao gerar diagnostico: {str(e)}")
-        return {
-            "mensagem": "Ocorreu um erro ao gerar o diagnostico.",
-            "resumo": f"Erro ao gerar sugestao: {str(e)}\n\n{traceback.format_exc()}",
-            "email": data["email"]
-        }
+        return {"mensagem": "Ocorreu um erro ao gerar o diagnostico.", "resumo": f"Erro ao gerar sugestao: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
 
 @app.post("/reset")
 async def resetar_diagnostico():
     global data
-    data = {
-        "nome": None,
-        "empresa": None,
-        "whatsapp": None,
-        "email": None,
-        "diagnostico": [],
-        "etapa_atual": 0,
-        "finalizado": False,
-        "iniciado": False,
-        "prompt": None
-    }
+    data = {"nome": None, "empresa": None, "whatsapp": None, "email": None, "diagnostico": [], "etapa_atual": 0, "finalizado": False, "iniciado": False, "prompt": None}
     logger.info("Diagnostico resetado pelo usuario")
     return {"status": "resetado"}
 
@@ -188,11 +156,7 @@ async def reindexar_rag():
         return {"status": "ok", "arquivos_indexados": total}
     except Exception as e:
         logger.error(f"Erro na reindexacao do RAG: {str(e)}")
-        return {
-            "status": "erro",
-            "mensagem": str(e),
-            "detalhes": traceback.format_exc()
-        }
+        return {"status": "erro", "mensagem": str(e), "detalhes": traceback.format_exc()}
 
 def gerar_prompt(data):
     nome = data["nome"]
@@ -221,10 +185,7 @@ def gerar_prompt(data):
         novos_clientes = int(data["diagnostico"][9])
     except Exception as e:
         logger.error("Erro ao processar valores numericos no prompt")
-        raise ValueError(
-            f"Erro ao converter valores numericos: {str(e)} | "
-            f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}"
-        ) from e
+        raise ValueError(f"Erro ao converter valores numericos: {str(e)} | ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}") from e
 
     return f"""
 Resumo do Diagnostico Comercial
