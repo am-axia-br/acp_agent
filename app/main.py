@@ -237,3 +237,4 @@ def chamar_llm(prompt):
     except Exception as e:
         logger.error("Erro na chamada a API OpenAI")
         raise RuntimeError("Erro na chamada a API OpenAI.") from e
+

@@ -49,9 +49,8 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
         ordenar_por = ["Empresas_Segmento", "Salario_Medio_R$"]
 
     segmentos_lista = [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
-
     logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
-    
+
     try:
         filtrados = pd.DataFrame()
 
@@ -143,4 +142,3 @@ def gerar_tabela_html(dataframe):
 def debug_dataframe(df_debug):
     print("\n[RAG DEBUG] Visualização dos primeiros registros:")
     print(df_debug.head())
-
