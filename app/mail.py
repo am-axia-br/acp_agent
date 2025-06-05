@@ -76,6 +76,10 @@ def enviar_email(data, resposta):
     if trecho_cidades:
         resposta = re.sub(r"\d{1,2}\..+?(?:perfil para parceria.+?\n?)", "", resposta, flags=re.DOTALL | re.IGNORECASE)
 
+    # Remove marcadores indesejados (** e #)
+    resposta = re.sub(r"\*\*(.*?)\*\*", r"\1", resposta)
+    resposta = re.sub(r"#*", "", resposta)
+
     # Formata os parágrafos do restante da resposta
     resposta_formatada = "".join(
         f"<p style='margin-bottom: 15px;'>{linha.strip()}</p>"

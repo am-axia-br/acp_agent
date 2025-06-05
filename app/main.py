@@ -21,7 +21,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-logger.info("Aplicação FastAPI iniciada")
+logger.info("Aplicacao FastAPI iniciada")
 
 # 🔁 Reindexar automaticamente ao iniciar
 @app.on_event("startup")
@@ -29,9 +29,9 @@ def indexar_automaticamente():
     try:
         from rag_parcerias import indexar_documentos
         total = indexar_documentos()
-        logger.info(f"Indexação automática no startup concluída com {total} arquivos.")
+        logger.info(f"Indexacao automatica no startup concluida com {total} arquivos.")
     except Exception as e:
-        logger.warning(f"Indexação automática ignorada: {e}")
+        logger.warning(f"Indexacao automatica ignorada: {e}")
 
 data = {
     "nome": None,
@@ -59,12 +59,12 @@ def home():
         "iniciado": False,
         "prompt": None
     }
-    logger.info("Página inicial acessada e dados resetados")
+    logger.info("Pagina inicial acessada e dados resetados")
     return FileResponse("static/index.html")
 
 @app.get("/chat")
 def chat_get():
-    return {"erro": "Método GET não permitido nesta rota. Use POST com corpo JSON contendo 'mensagem'."}
+    return {"erro": "Metodo GET nao permitido nesta rota. Use POST com corpo JSON contendo 'mensagem'."}
 
 class Mensagem(BaseModel):
     mensagem: str
@@ -73,12 +73,12 @@ perguntas = [
     "Qual o site da empresa?",
     "Quais segmentos a empresa atende?",
     "Poderia citar 3 clientes atuais?",
-    "Quais dores a sua empresa resolve e quais benefícios são levados aos clientes?",
+    "Quais dores a sua empresa resolve e quais beneficios sao levados aos clientes?",
     "Quais os seus diferenciais?",
-    "Quais os produtos e serviços vendidos?",
-    "Qual o modelo de negócio da empresa? Comercializa licenças? Cobra mensalidade? Cobra projeto?",
-    "Qual o ticket médio dos negócios?",
-    "Qual o ciclo médio de vendas (em dias)?",
+    "Quais os produtos e servicos vendidos?",
+    "Qual o modelo de negocio da empresa? Comercializa licencas? Cobra mensalidade? Cobra projeto?",
+    "Qual o ticket medio dos negocios?",
+    "Qual o ciclo medio de vendas (em dias)?",
     "Qual a sua expectativa de vendas de novos clientes pelos canais mensalmente?"
 ]
 
@@ -90,8 +90,8 @@ async def chat(req: Request):
 
     if not data["iniciado"]:
         data["iniciado"] = True
-        logger.info("Início do diagnóstico iniciado")
-        return {"mensagem": "Olá... Para começarmos o diagnóstico, me fale o seu nome..."}
+        logger.info("Inicio do diagnostico iniciado")
+        return {"mensagem": "Ola... Para comecarmos o diagnostico, me fale o seu nome..."}
 
     if not data["nome"]:
         data["nome"] = msg
@@ -106,17 +106,22 @@ async def chat(req: Request):
         if re.match(r"^\d{11}$", msg):
             data["whatsapp"] = msg
             return {"pergunta": "Qual o seu e-mail?"}
-        logger.warning("WhatsApp em formato inválido")
-        return {"pergunta": "Formato inválido. Exemplo: DDD9XXXXYYYY"}
+        logger.warning("WhatsApp em formato invalido")
+        return {"pergunta": "Formato invalido. Exemplo: DDD9XXXXYYYY"}
 
     if not data["email"]:
         if re.match(r"^[\w\.-]+@[\w\.-]+\.\w{2,4}$", msg):
             data["email"] = msg
             return {"mensagem": "Obrigado! Agora vamos entender melhor sua empresa.", "pergunta": perguntas[0]}
-        logger.warning("E-mail inválido")
-        return {"pergunta": "E-mail inválido. Envie um formato válido."}
+        logger.warning("E-mail invalido")
+        return {"pergunta": "E-mail invalido. Envie um formato valido."}
 
     if data["etapa_atual"] < len(perguntas):
+        if data["etapa_atual"] in [7, 8, 9]:
+            valor = re.sub(r"[^\d]", "", msg)
+            if not valor.isdigit():
+                return {"pergunta": "Por favor, responda apenas com numeros (sem R$, pontos ou virgulas)."}
+
         data["diagnostico"].append(msg)
         data["etapa_atual"] += 1
         if data["etapa_atual"] < len(perguntas):
@@ -126,33 +131,34 @@ async def chat(req: Request):
                 prompt = gerar_prompt(data)
                 data["prompt"] = prompt
                 data["finalizado"] = True
-                logger.info("Diagnóstico preparado com sucesso")
-                return {"mensagem": "Analisando as respostas e preparando o seu diagnóstico...", "loading": True}
+                logger.info("Diagnostico preparado com sucesso")
+                return {"mensagem": "Analisando as respostas e preparando o seu diagnostico...", "loading": True}
             except Exception as e:
-                logger.error(f"Erro ao preparar diagnóstico: {str(e)}")
+                logger.error(f"Erro ao preparar diagnostico: {str(e)}")
                 return {
-                    "mensagem": "Ocorreu um erro ao preparar o diagnóstico.",
+                    "mensagem": "Ocorreu um erro ao preparar o diagnostico.",
                     "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}",
                     "email": data["email"]
                 }
 
-    return {"mensagem": "Diagnóstico já concluído."}
+    return {"mensagem": "Diagnostico ja concluido."}
 
 @app.post("/gerar-diagnostico")
 async def gerar_diagnostico():
     try:
         resposta = chamar_llm(data["prompt"])
-        logger.info("Diagnóstico gerado com sucesso pela LLM")
+        enviar_email(data, resposta)
+        logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
         return {
-            "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
+            "mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:",
             "resumo": resposta,
             "email": data["email"]
         }
     except Exception as e:
-        logger.error(f"Erro ao gerar diagnóstico: {str(e)}")
+        logger.error(f"Erro ao gerar diagnostico: {str(e)}")
         return {
-            "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
-            "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
+            "mensagem": "Ocorreu um erro ao gerar o diagnostico.",
+            "resumo": f"Erro ao gerar sugestao: {str(e)}\n\n{traceback.format_exc()}",
             "email": data["email"]
         }
 
@@ -170,7 +176,7 @@ async def resetar_diagnostico():
         "iniciado": False,
         "prompt": None
     }
-    logger.info("Diagnóstico resetado pelo usuário")
+    logger.info("Diagnostico resetado pelo usuario")
     return {"status": "resetado"}
 
 @app.post("/reindexar-rag")
@@ -178,10 +184,10 @@ async def reindexar_rag():
     try:
         from rag_parcerias import indexar_documentos
         total = indexar_documentos()
-        logger.info(f"Reindexação realizada com {total} arquivos")
+        logger.info(f"Reindexacao realizada com {total} arquivos")
         return {"status": "ok", "arquivos_indexados": total}
     except Exception as e:
-        logger.error(f"Erro na reindexação do RAG: {str(e)}")
+        logger.error(f"Erro na reindexacao do RAG: {str(e)}")
         return {
             "status": "erro",
             "mensagem": str(e),
@@ -199,7 +205,7 @@ def gerar_prompt(data):
 
     if cidades_df.shape[0] < 30:
         faltando = 30 - cidades_df.shape[0]
-        cidades_fake = [f"CidadeGenérica{i+1}" for i in range(faltando)]
+        cidades_fake = [f"CidadeGenerica{i+1}" for i in range(faltando)]
         for cid in cidades_fake:
             cidades_df.loc[len(cidades_df)] = [cid, 100000, 10.0, 500, 100, 3000.0]
 
@@ -211,27 +217,27 @@ def gerar_prompt(data):
         raw_novos = str(data["diagnostico"][9]).strip()
 
         if not raw_ticket.isdigit() or not raw_ciclo.isdigit() or not raw_novos.isdigit():
-            raise ValueError(f"Valores inválidos recebidos: ticket={raw_ticket}, ciclo={raw_ciclo}, novos={raw_novos}")
+            raise ValueError(f"Valores invalidos recebidos: ticket={raw_ticket}, ciclo={raw_ciclo}, novos={raw_novos}")
 
         ticket = float(raw_ticket)
         ciclo = int(raw_ciclo)
         novos_clientes = int(raw_novos)
     except Exception as e:
-        logger.error("Erro ao processar valores numéricos no prompt")
+        logger.error("Erro ao processar valores numericos no prompt")
         raise ValueError(
-            f"Erro ao converter valores numéricos: {str(e)} | "
+            f"Erro ao converter valores numericos: {str(e)} | "
             f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}"
         ) from e
 
     conhecimento_parcerias = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
 
     return f"""
-<h2>Resumo do Diagnóstico Comercial</h2>
-<p>Olá, {data['nome']},</p>
+<h2>Resumo do Diagnostico Comercial</h2>
+<p>Ola, {data['nome']},</p>
 
-<p>Com base nas suas respostas, desenvolvemos abaixo o diagnóstico detalhado para sua empresa:</p>
+<p>Com base nas suas respostas, desenvolvemos abaixo o diagnostico detalhado para sua empresa:</p>
 
-<h3>Análise de Canais de Vendas para {data['empresa']}</h3>
+<h3>Analise de Canais de Vendas para {data['empresa']}</h3>
 <p>Veja abaixo os dados analisados:</p>
 {bloco_respostas}
 
@@ -241,22 +247,22 @@ def gerar_prompt(data):
 <h3>📊 Cidades com maior potencial para parcerias</h3>
 {cidades_html}
 
-<h3>📈 Projeção de Resultados com 20 Canais Ativos</h3>
+<h3>📈 Projecao de Resultados com 20 Canais Ativos</h3>
 <ul>
-  <li><strong>Ticket Médio:</strong> R${ticket:,.2f}</li>
+  <li><strong>Ticket Medio:</strong> R${ticket:,.2f}</li>
   <li><strong>Meta Mensal de Novos Clientes por Canal:</strong> {novos_clientes} cliente(s)</li>
   <li><strong>Total de Novos Clientes com 20 Canais:</strong> {novos_clientes * 20} clientes</li>
   <li><strong>Receita Mensal Estimada:</strong> R${ticket * novos_clientes * 20:,.2f}</li>
 </ul>
 
-<h3>🔍 Cálculo de Oportunidades e Prospecções por Canal</h3>
-<p><strong>Premissas:</strong> Conversão média do setor: 20%</p>
+<h3>🔍 Calculo de Oportunidades e Prospecoes por Canal</h3>
+<p><strong>Premissas:</strong> Conversao media do setor: 20%</p>
 <ul>
-  <li><strong>Oportunidades Necessárias por Canal:</strong> {int(novos_clientes / 0.2)} oportunidades</li>
-  <li><strong>Prospecções Necessárias por Canal:</strong> {int((novos_clientes / 0.2) / 0.2)} prospecções</li>
+  <li><strong>Oportunidades Necessarias por Canal:</strong> {int(novos_clientes / 0.2)} oportunidades</li>
+  <li><strong>Prospecoes Necessarias por Canal:</strong> {int((novos_clientes / 0.2) / 0.2)} prospeccoes</li>
 </ul>
 
-<p>Este diagnóstico fornece um panorama inicial para a expansão da sua empresa por meio de canais de vendas. Nossa recomendação é iniciar o onboarding com 3 a 5 canais para validação.</p>
+<p>Este diagnostico fornece um panorama inicial para a expansao da sua empresa por meio de canais de vendas. Nossa recomendacao e iniciar o onboarding com 3 a 5 canais para validacao.</p>
 """
 
 def chamar_llm(prompt):
@@ -264,7 +270,7 @@ def chamar_llm(prompt):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Você é um consultor especialista em canais de vendas."},
+                {"role": "system", "content": "Voce e um consultor especialista em canais de vendas."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -272,5 +278,5 @@ def chamar_llm(prompt):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.error("Erro na chamada à API OpenAI")
-        raise RuntimeError("Erro na chamada à API OpenAI.") from e
+        logger.error("Erro na chamada a API OpenAI")
+        raise RuntimeError("Erro na chamada a API OpenAI.") from e
