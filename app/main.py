@@ -162,7 +162,7 @@ def gerar_prompt(data):
     nome = data["nome"]
     empresa = data["empresa"]
     segmento_original = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
-    segmentos_normalizados = " ".join(normalizar_segmentos(segmento_original))
+    segmentos_normalizados = normalizar_segmentos(segmento_original)
 
     bloco_respostas = ""
     for i, resp in enumerate(data["diagnostico"]):
@@ -237,3 +237,4 @@ def chamar_llm(prompt):
     except Exception as e:
         logger.error("Erro na chamada a API OpenAI")
         raise RuntimeError("Erro na chamada a API OpenAI.") from e
+

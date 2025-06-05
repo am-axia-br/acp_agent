@@ -3,6 +3,7 @@ logger = get_logger(__name__)
 
 import pandas as pd
 import numpy as np
+from difflib import get_close_matches
 
 # Carregar base de dados do IBGE
 df = pd.read_excel("Tabela 14.xlsx")
@@ -16,7 +17,7 @@ df.columns = [
 
 # Limpar dados
 df = df[df["Municipio"].notna()]
-df = df[~df["Municipio"].astype(str).str.contains("Munic\u00edpios com|Tabela|Total", na=False)]
+df = df[~df["Municipio"].astype(str).str.contains("Municípios com|Tabela|Total", na=False)]
 df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
 df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
 
@@ -48,6 +49,10 @@ def simular_populacao_pib(df_segmento):
 def normalizar_segmentos(segmentos: str):
     return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
 
+def buscar_similares(termo, lista_opcoes, threshold=0.6):
+    matches = get_close_matches(termo, lista_opcoes, n=1, cutoff=threshold)
+    return matches[0] if matches else termo
+
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, ordenar_por=None):
     if ordenar_por is None:
         ordenar_por = ["Empresas_Segmento", "Salario_Medio_R$"]
@@ -57,9 +62,11 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
 
     try:
         filtrados = pd.DataFrame()
+        descricoes_cnae = df["Descricao_CNAE"].dropna().unique().tolist()
 
         for termo in segmentos_lista:
-            encontrados = df[df["Descricao_CNAE"].astype(str).str.contains(termo, case=False, na=False)]
+            termo_similar = buscar_similares(termo, descricoes_cnae)
+            encontrados = df[df["Descricao_CNAE"].astype(str).str.contains(termo_similar, case=False, na=False)]
             if not encontrados.empty:
                 filtrados = pd.concat([filtrados, encontrados])
             else:
@@ -146,3 +153,4 @@ def gerar_tabela_html(dataframe):
 def debug_dataframe(df_debug):
     print("\n[RAG DEBUG] Visualização dos primeiros registros:")
     print(df_debug.head())
+
