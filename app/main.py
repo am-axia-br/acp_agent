@@ -23,7 +23,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logger.info("Aplicacao FastAPI iniciada")
 
-# 🔁 Reindexar automaticamente ao iniciar
 @app.on_event("startup")
 def indexar_automaticamente():
     try:
@@ -117,10 +116,11 @@ async def chat(req: Request):
         return {"pergunta": "E-mail invalido. Envie um formato valido."}
 
     if data["etapa_atual"] < len(perguntas):
-        if data["etapa_atual"] in [7, 8, 9]:
+        if data["etapa_atual"] in [7, 8, 9]:  # apenas números
             valor = re.sub(r"[^\d]", "", msg)
             if not valor.isdigit():
                 return {"pergunta": "Por favor, responda apenas com numeros (sem R$, pontos ou virgulas)."}
+            msg = valor
 
         data["diagnostico"].append(msg)
         data["etapa_atual"] += 1
@@ -212,16 +212,9 @@ def gerar_prompt(data):
     cidades_html = gerar_tabela_html(cidades_df)
 
     try:
-        raw_ticket = str(data["diagnostico"][7]).strip().replace("R$", "").replace(",", "").replace(".", "")
-        raw_ciclo = str(data["diagnostico"][8]).strip()
-        raw_novos = str(data["diagnostico"][9]).strip()
-
-        if not raw_ticket.isdigit() or not raw_ciclo.isdigit() or not raw_novos.isdigit():
-            raise ValueError(f"Valores invalidos recebidos: ticket={raw_ticket}, ciclo={raw_ciclo}, novos={raw_novos}")
-
-        ticket = float(raw_ticket)
-        ciclo = int(raw_ciclo)
-        novos_clientes = int(raw_novos)
+        ticket = float(data["diagnostico"][7])
+        ciclo = int(data["diagnostico"][8])
+        novos_clientes = int(data["diagnostico"][9])
     except Exception as e:
         logger.error("Erro ao processar valores numericos no prompt")
         raise ValueError(
