@@ -16,7 +16,7 @@ df.columns = [
 
 # Limpar dados
 df = df[df["Municipio"].notna()]
-df = df[~df["Municipio"].astype(str).str.contains("Municípios com|Tabela|Total", na=False)]
+df = df[~df["Municipio"].astype(str).str.contains("Munic\u00edpios com|Tabela|Total", na=False)]
 df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
 df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
 
@@ -44,11 +44,15 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
+# Função de normalização dos segmentos recebidos
+def normalizar_segmentos(segmentos: str):
+    return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
+
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, ordenar_por=None):
     if ordenar_por is None:
         ordenar_por = ["Empresas_Segmento", "Salario_Medio_R$"]
 
-    segmentos_lista = [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
+    segmentos_lista = normalizar_segmentos(segmentos)
     logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
 
     try:

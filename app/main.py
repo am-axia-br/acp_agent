@@ -12,7 +12,7 @@ import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
-from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html
+from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html, normalizar_segmentos
 from rag_parcerias import buscar_conhecimento
 
 load_dotenv()
@@ -162,7 +162,7 @@ def gerar_prompt(data):
     nome = data["nome"]
     empresa = data["empresa"]
     segmento_original = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
-    segmentos_normalizados = normalizar_segmentos(segmento_original)
+    segmentos_normalizados = " ".join(normalizar_segmentos(segmento_original))
 
     bloco_respostas = ""
     for i, resp in enumerate(data["diagnostico"]):
@@ -237,4 +237,3 @@ def chamar_llm(prompt):
     except Exception as e:
         logger.error("Erro na chamada a API OpenAI")
         raise RuntimeError("Erro na chamada a API OpenAI.") from e
-
