@@ -17,13 +17,13 @@ df.columns = [
 
 # Limpar dados
 df = df[df["Municipio"].notna()]
-df = df[~df["Municipio"].astype(str).str.contains("Municípios com|Tabela|Total", na=False)]
+df = df[~df["Municipio"].astype(str).str.contains("Munic\u00edpios com|Tabela|Total", na=False)]
 df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
 df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
 
 # Converter colunas numéricas
 df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
-df["Salario_Medio_R$"] = pd.to_numeric(df["Salario_Medio_R$"] , errors="coerce")
+df["Salario_Medio_R$"] = pd.to_numeric(df["Salario_Medio_R$"], errors="coerce")
 
 # Simulação de população, PIB e salário
 def simular_populacao_pib(df_segmento):
@@ -47,6 +47,8 @@ def simular_populacao_pib(df_segmento):
 
 # Função de normalização dos segmentos recebidos
 def normalizar_segmentos(segmentos: str):
+    if isinstance(segmentos, list):
+        segmentos = " ".join(segmentos)
     return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
 
 def buscar_similares(termo, lista_opcoes, threshold=0.6):
