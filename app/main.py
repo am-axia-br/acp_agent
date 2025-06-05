@@ -116,7 +116,7 @@ async def chat(req: Request):
         return {"pergunta": "E-mail invalido. Envie um formato valido."}
 
     if data["etapa_atual"] < len(perguntas):
-        if data["etapa_atual"] in [7, 8, 9]:  # apenas números
+        if data["etapa_atual"] in [7, 8, 9]:
             valor = re.sub(r"[^\d]", "", msg)
             if not valor.isdigit():
                 return {"pergunta": "Por favor, responda apenas com numeros (sem R$, pontos ou virgulas)."}
@@ -147,7 +147,7 @@ async def chat(req: Request):
 async def gerar_diagnostico():
     try:
         resposta = chamar_llm(data["prompt"])
-        enviar_email(data, resposta)
+        enviar_email(data, resposta, copia_para=["alexandre.maia@acp.tec.br"])
         logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
         return {
             "mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:",
@@ -195,26 +195,35 @@ async def reindexar_rag():
         }
 
 def gerar_prompt(data):
-    bloco_respostas = "<ul>"
-    for i, resp in enumerate(data["diagnostico"]):
-        bloco_respostas += f"<li><strong>{i+1}) {perguntas[i]}</strong><br>{resp}</li>"
-    bloco_respostas += "</ul>"
-
+    nome = data["nome"]
+    empresa = data["empresa"]
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
-    cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
 
+    bloco_respostas = ""
+    for i, resp in enumerate(data["diagnostico"]):
+        bloco_respostas += f"{i+1}) {perguntas[i]} \n{resp}\n\n"
+
+    conhecimento = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
+
+    cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
     if cidades_df.shape[0] < 30:
         faltando = 30 - cidades_df.shape[0]
         cidades_fake = [f"CidadeGenerica{i+1}" for i in range(faltando)]
         for cid in cidades_fake:
             cidades_df.loc[len(cidades_df)] = [cid, 100000, 10.0, 500, 100, 3000.0]
-
-    cidades_html = gerar_tabela_html(cidades_df)
+    cidades_lista = cidades_df["Municipio"].tolist()
+    cidades_texto = ", ".join(cidades_lista)
 
     try:
-        ticket = float(data["diagnostico"][7])
-        ciclo = int(data["diagnostico"][8])
-        novos_clientes = int(data["diagnostico"][9])
+        raw_ticket = str(data["diagnostico"][7]).strip().replace("R$", "").replace(",", "").replace(".", "")
+        raw_ciclo = str(data["diagnostico"][8]).strip()
+        raw_novos = str(data["diagnostico"][9]).strip()
+        if not raw_ticket.isdigit() or not raw_ciclo.isdigit() or not raw_novos.isdigit():
+            raise ValueError("Ticket, ciclo ou meta invalido(s)")
+
+        ticket = float(raw_ticket)
+        ciclo = int(raw_ciclo)
+        novos_clientes = int(raw_novos)
     except Exception as e:
         logger.error("Erro ao processar valores numericos no prompt")
         raise ValueError(
@@ -222,40 +231,33 @@ def gerar_prompt(data):
             f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}"
         ) from e
 
-    conhecimento_parcerias = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
-
     return f"""
-<h2>Resumo do Diagnostico Comercial</h2>
-<p>Ola, {data['nome']},</p>
+Resumo do Diagnostico Comercial
 
-<p>Com base nas suas respostas, desenvolvemos abaixo o diagnostico detalhado para sua empresa:</p>
+Ola, {nome},
 
-<h3>Analise de Canais de Vendas para {data['empresa']}</h3>
-<p>Veja abaixo os dados analisados:</p>
+Com base nas suas respostas, desenvolvemos abaixo o diagnostico detalhado para sua empresa: {empresa}.
+
+Dados analisados:
 {bloco_respostas}
 
-<h3>Modelos Ideais de Canais de Vendas</h3>
-{conhecimento_parcerias}
+Modelos ideais de canais de vendas:
+{conhecimento}
 
-<h3>📊 Cidades com maior potencial para parcerias</h3>
-{cidades_html}
+Cidades com maior potencial para parcerias:
+{cidades_texto}
 
-<h3>📈 Projecao de Resultados com 20 Canais Ativos</h3>
-<ul>
-  <li><strong>Ticket Medio:</strong> R${ticket:,.2f}</li>
-  <li><strong>Meta Mensal de Novos Clientes por Canal:</strong> {novos_clientes} cliente(s)</li>
-  <li><strong>Total de Novos Clientes com 20 Canais:</strong> {novos_clientes * 20} clientes</li>
-  <li><strong>Receita Mensal Estimada:</strong> R${ticket * novos_clientes * 20:,.2f}</li>
-</ul>
+Projecao de resultados com 20 canais ativos:
+- Ticket Medio: R${ticket:,.2f}
+- Meta Mensal de Novos Clientes por Canal: {novos_clientes} cliente(s)
+- Total de Novos Clientes com 20 Canais: {novos_clientes * 20} clientes
+- Receita Mensal Estimada: R${ticket * novos_clientes * 20:,.2f}
 
-<h3>🔍 Calculo de Oportunidades e Prospecoes por Canal</h3>
-<p><strong>Premissas:</strong> Conversao media do setor: 20%</p>
-<ul>
-  <li><strong>Oportunidades Necessarias por Canal:</strong> {int(novos_clientes / 0.2)} oportunidades</li>
-  <li><strong>Prospecoes Necessarias por Canal:</strong> {int((novos_clientes / 0.2) / 0.2)} prospeccoes</li>
-</ul>
+Calculo de oportunidades e prospeccoes por canal (base: 20% de conversao):
+- Oportunidades Necessarias por Canal: {int(novos_clientes / 0.2)}
+- Prospeccoes Necessarias por Canal: {int((novos_clientes / 0.2) / 0.2)}
 
-<p>Este diagnostico fornece um panorama inicial para a expansao da sua empresa por meio de canais de vendas. Nossa recomendacao e iniciar o onboarding com 3 a 5 canais para validacao.</p>
+Nossa recomendacao e iniciar o onboarding com 3 a 5 canais para validacao.
 """
 
 def chamar_llm(prompt):

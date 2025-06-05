@@ -56,7 +56,7 @@ def formatar_tabela_cidades(texto):
     </div>
     """
 
-def enviar_email(data, resposta):
+def enviar_email(data, resposta, copia_para=None):
     remetente = os.getenv("EMAIL_REMETENTE")
     senha = os.getenv("EMAIL_SENHA")
     destinatario = data.get("email") or os.getenv("EMAIL_DESTINO")
@@ -69,7 +69,9 @@ def enviar_email(data, resposta):
     msg["Subject"] = f"Diagnóstico de Canais - {data['empresa']}"
     msg["From"] = remetente
     msg["To"] = destinatario
-    msg["Bcc"] = "alexandre.maia@acp.tec.br"
+
+    if copia_para:
+        msg["Bcc"] = ", ".join(copia_para)
 
     # Separa o trecho das cidades
     trecho_cidades = formatar_tabela_cidades(resposta)
@@ -155,10 +157,10 @@ def enviar_email(data, resposta):
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(remetente, senha)
-            server.sendmail(remetente, [destinatario, "alexandre.maia@acp.tec.br"], msg.as_string())
+            todos_destinatarios = [destinatario]
+            if copia_para:
+                todos_destinatarios.extend(copia_para)
+            server.sendmail(remetente, todos_destinatarios, msg.as_string())
         print("✅ E-mail enviado com sucesso!")
     except Exception as e:
         print(f"❌ Erro ao enviar e-mail: {e}")
-
-
-
