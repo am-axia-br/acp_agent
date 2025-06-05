@@ -16,29 +16,22 @@ df.columns = [
 
 # Limpar dados
 df = df[df["Municipio"].notna()]
-df = df[~df["Municipio"].astype(str).str.contains("Municípios com|Tabela|Total", na=False)]
+df = df[~df["Municipio"].astype(str).str.contains("Munic\u00edpios com|Tabela|Total", na=False)]
 df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
 df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
 
 # Converter colunas numéricas
 df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
-df["Salario_Medio_R$"] = pd.to_numeric(df["Salario_Medio_R$"], errors="coerce")
+df["Salario_Medio_R$"] = pd.to_numeric(df["Salario_Medio_R$"] , errors="coerce")
 
 # Simulação de população, PIB e salário
 def simular_populacao_pib(df_segmento):
     municipios = df_segmento["Municipio"].unique()
     empresas = df_segmento.groupby("Municipio")["Unidades_Locais"].sum().values
 
-    # População proporcional ao número de empresas (até 20 milhões)
     populacoes = np.clip(np.round(empresas * np.random.uniform(15, 60)).astype(int), 1000, 20_000_000)
-
-    # PIB proporcional ao número de empresas (até 200 bi)
     pibs = np.clip(np.round(empresas * np.random.uniform(0.02, 0.08), 2), 0.3, 200.0)
-
-    # Perfil de canal baseado em fração das empresas
     perfil_canal = np.round(empresas * np.random.uniform(0.1, 0.5)).astype(int)
-
-    # Salário médio com variação realista
     media_salarial_base = df_segmento.groupby("Municipio")["Salario_Medio_R$"].mean().values
     salarios = np.clip(np.round(media_salarial_base * np.random.uniform(0.85, 1.25), 2), 1500.0, 15000.0)
 
@@ -52,10 +45,6 @@ def simular_populacao_pib(df_segmento):
     })
 
 def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=None):
-    """
-    Filtra os municípios com maior potencial para o segmento informado.
-    Se houver menos de 30 resultados, completa com cidades genéricas.
-    """
     if ordenar_por is None:
         ordenar_por = ["Empresas_Segmento", "Salario_Medio_R$"]
 
@@ -63,6 +52,7 @@ def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=
         filtrado = df[df["Descricao_CNAE"].astype(str).str.contains(segmento, case=False, na=False)]
 
         if filtrado.empty:
+            logger.warning(f"Segmento '{segmento}' nao encontrado no RAG. Retornando vazio.")
             return pd.DataFrame(columns=[
                 "Municipio", "Populacao", "PIB",
                 "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"
@@ -71,11 +61,10 @@ def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=
         dados_complementares = simular_populacao_pib(filtrado)
         final_df = dados_complementares.sort_values(by=ordenar_por, ascending=False).reset_index(drop=True)
 
-        # Se menos de 30, preencher com genéricos
         if len(final_df) < top_n:
             faltam = top_n - len(final_df)
             extras = pd.DataFrame({
-                "Municipio": [f"Município Genérico {i+1}" for i in range(faltam)],
+                "Municipio": [f"Cidade Generica {i+1}" for i in range(faltam)],
                 "Populacao": np.random.randint(1000, 20000000, size=faltam),
                 "PIB": np.round(np.random.uniform(0.3, 10.0, size=faltam), 2),
                 "Empresas_Segmento": np.random.randint(20, 100, size=faltam),
@@ -87,16 +76,13 @@ def filtrar_municipios_por_segmento(segmento: str, top_n: int = 30, ordenar_por=
         return final_df.head(top_n)
 
     except Exception as e:
-        print(f"[RAG ENGINE] Erro ao filtrar segmento '{segmento}': {e}")
+        logger.error(f"Erro ao filtrar segmento '{segmento}': {e}")
         return pd.DataFrame(columns=[
             "Municipio", "Populacao", "PIB",
             "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"
         ])
 
 def gerar_tabela_html(dataframe):
-    """
-    Gera uma tabela HTML estilizada com os dados de municípios recomendados.
-    """
     if dataframe.empty:
         return """
         <div class='paragrafo'>
@@ -140,8 +126,5 @@ def gerar_tabela_html(dataframe):
     """
 
 def debug_dataframe(df_debug):
-    """
-    Imprime as 5 primeiras linhas do DataFrame para debug no terminal.
-    """
     print("\n[RAG DEBUG] Visualização dos primeiros registros:")
     print(df_debug.head())

@@ -203,7 +203,9 @@ def gerar_prompt(data):
     for i, resp in enumerate(data["diagnostico"]):
         bloco_respostas += f"{i+1}) {perguntas[i]} \n{resp}\n\n"
 
-    conhecimento = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
+    conhecimento_modelos = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
+    conhecimento_perfis = buscar_conhecimento("perfis e tipos ideais de canais de vendas")
+    conhecimento_servicos = buscar_conhecimento("servicos agregados em canais de vendas")
 
     cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
     if cidades_df.shape[0] < 30:
@@ -211,19 +213,12 @@ def gerar_prompt(data):
         cidades_fake = [f"CidadeGenerica{i+1}" for i in range(faltando)]
         for cid in cidades_fake:
             cidades_df.loc[len(cidades_df)] = [cid, 100000, 10.0, 500, 100, 3000.0]
-    cidades_lista = cidades_df["Municipio"].tolist()
-    cidades_texto = ", ".join(cidades_lista)
+    cidades_html = gerar_tabela_html(cidades_df)
 
     try:
-        raw_ticket = str(data["diagnostico"][7]).strip().replace("R$", "").replace(",", "").replace(".", "")
-        raw_ciclo = str(data["diagnostico"][8]).strip()
-        raw_novos = str(data["diagnostico"][9]).strip()
-        if not raw_ticket.isdigit() or not raw_ciclo.isdigit() or not raw_novos.isdigit():
-            raise ValueError("Ticket, ciclo ou meta invalido(s)")
-
-        ticket = float(raw_ticket)
-        ciclo = int(raw_ciclo)
-        novos_clientes = int(raw_novos)
+        ticket = float(data["diagnostico"][7])
+        ciclo = int(data["diagnostico"][8])
+        novos_clientes = int(data["diagnostico"][9])
     except Exception as e:
         logger.error("Erro ao processar valores numericos no prompt")
         raise ValueError(
@@ -242,10 +237,15 @@ Dados analisados:
 {bloco_respostas}
 
 Modelos ideais de canais de vendas:
-{conhecimento}
+{conhecimento_modelos}
 
-Cidades com maior potencial para parcerias:
-{cidades_texto}
+Tipos, perfis e perfis ideais:
+{conhecimento_perfis}
+
+Servicos agregados para canais:
+{conhecimento_servicos}
+
+{cidades_html}
 
 Projecao de resultados com 20 canais ativos:
 - Ticket Medio: R${ticket:,.2f}
