@@ -179,14 +179,20 @@ async def reindexar_rag():
         }
 
 def gerar_prompt(data):
-    blocos = "\n".join([f"{i+1}) {perguntas[i]} {resp}" for i, resp in enumerate(data["diagnostico"])])
+    bloco_respostas = "<ul>"
+    for i, resp in enumerate(data["diagnostico"]):
+        bloco_respostas += f"<li><strong>{i+1}) {perguntas[i]}</strong><br>{resp}</li>"
+    bloco_respostas += "</ul>"
+
     segmento = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
     cidades_df = filtrar_municipios_por_segmento(segmento, top_n=30)
+
     if cidades_df.shape[0] < 30:
         faltando = 30 - cidades_df.shape[0]
         cidades_fake = [f"CidadeGenérica{i+1}" for i in range(faltando)]
         for cid in cidades_fake:
             cidades_df.loc[len(cidades_df)] = [cid, 100000, 10.0, 500, 100, 3000.0]
+
     cidades_html = gerar_tabela_html(cidades_df)
 
     try:
@@ -207,41 +213,39 @@ def gerar_prompt(data):
             f"ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}") from e
 
     conhecimento_parcerias = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
-    conhecimento_formatado = f"\n### Base de Conhecimento sobre Parcerias:\n\n{conhecimento_parcerias}\n\n"
 
     return f"""
-Você é um consultor especialista em canais de vendas. Use os dados do cliente e o conhecimento abaixo para gerar um diagnóstico estruturado com os seguintes tópicos:
+<h2>Resumo do Diagnóstico Comercial</h2>
+<p>Olá, {data['nome']},</p>
 
-{conhecimento_formatado}
+<p>Com base nas suas respostas, desenvolvemos abaixo o diagnóstico detalhado para sua empresa:</p>
 
-01) Resumo sobre a empresa. Pesquise no site informado e use dados disponíveis na internet.
-02) Situação do mercado e perfil dos clientes que essa empresa atende.
-03) Oportunidades de crescimento e expansão da empresa com canais de vendas.
-04) Liste 5 modelos ideais de canais de vendas com explicações de funcionamento, vantagens e serviços agregados.
-05) Descreva os perfis ideais de empresas que podem se tornar canais de vendas.
-06) Liste 30 cidades com maior potencial para abertura de canais (dados: nome, população, PIB, empresas no segmento, empresas com perfil de canal, salário médio).
+<h3>Análise de Canais de Vendas para {data['empresa']}</h3>
+<p>Veja abaixo os dados analisados:</p>
+{bloco_respostas}
 
-<h3 style='color:#5e17eb;margin-top:30px;'>📍 Cidades com Potencial</h3>
+<h3>Modelos Ideais de Canais de Vendas</h3>
+{conhecimento_parcerias}
+
+<h3>📊 Cidades com maior potencial para parcerias</h3>
 {cidades_html}
 
-07) Faça um cálculo de retorno financeiro com 20 canais ativos, assumindo o ticket médio informado.
-Além disso, calcule:
-- Quantas oportunidades por canal são necessárias para atingir a meta mensal de novos clientes.
-- Quantas prospecções são necessárias por canal com base no índice médio de conversão do setor da empresa (pesquise esse índice).
+<h3>📈 Projeção de Resultados com 20 Canais Ativos</h3>
+<ul>
+  <li><strong>Ticket Médio:</strong> R${ticket:,.2f}</li>
+  <li><strong>Meta Mensal de Novos Clientes por Canal:</strong> {novos_clientes} cliente(s)</li>
+  <li><strong>Total de Novos Clientes com 20 Canais:</strong> {novos_clientes * 20} clientes</li>
+  <li><strong>Receita Mensal Estimada:</strong> R${ticket * novos_clientes * 20:,.2f}</li>
+</ul>
 
-Dados:
-- Ticket médio: R${ticket:,.2f}
-- Ciclo médio de vendas: {ciclo} dias
-- Meta mensal de novos clientes por canal: {novos_clientes}
+<h3>🔍 Cálculo de Oportunidades e Prospecções por Canal</h3>
+<p><strong>Premissas:</strong> Conversão média do setor: 20%</p>
+<ul>
+  <li><strong>Oportunidades Necessárias por Canal:</strong> {int(novos_clientes / 0.2)} oportunidades</li>
+  <li><strong>Prospecções Necessárias por Canal:</strong> {int((novos_clientes / 0.2) / 0.2)} prospecções</li>
+</ul>
 
-Dados do diagnóstico:
-Nome: {data['nome']}
-Empresa: {data['empresa']}
-WhatsApp: {data['whatsapp']}
-E-mail: {data['email']}
-
-Respostas:
-{blocos}
+<p>Este diagnóstico fornece um panorama inicial para a expansão da sua empresa por meio de canais de vendas. Nossa recomendação é iniciar o onboarding com 3 a 5 canais para validação.</p>
 """
 
 def chamar_llm(prompt):
@@ -259,4 +263,3 @@ def chamar_llm(prompt):
     except Exception as e:
         logger.error("Erro na chamada à API OpenAI")
         raise RuntimeError("Erro na chamada à API OpenAI.") from e
-
