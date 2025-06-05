@@ -12,7 +12,7 @@ import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
-from rag_engine import filtrar_municipios_por_segmento, gerar_tabela_html, normalizar_segmentos
+from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html
 from rag_parcerias import buscar_conhecimento
 
 load_dotenv()
