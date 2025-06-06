@@ -8,10 +8,8 @@ from pathlib import Path
 import pandas as pd
 import os
 
-# Corrigido: agora aponta direto para a raiz 'app/'
 ARQUIVO_EXCEL = "canais.xlsx"
 INDEX_DIR = "vectorstore_canais/"
-# Garante apenas o diretório do índice
 os.makedirs(INDEX_DIR, exist_ok=True)
 
 def carregar_documentos():
@@ -63,12 +61,16 @@ def carregar_index():
     embeddings = OpenAIEmbeddings()
     return FAISS.load_local(INDEX_DIR, embeddings, allow_dangerous_deserialization=True)
 
-def buscar_conhecimento(pergunta: str, k=3) -> str:
+def buscar_conhecimento(pergunta: str, k=5) -> str:
     """Realiza uma busca semântica na base indexada e retorna os melhores trechos."""
-    db = carregar_index()
-    docs = db.similarity_search(pergunta, k=k)
-    resposta = "\n\n".join(doc.page_content.strip() for doc in docs)
-    return resposta
+    try:
+        db = carregar_index()
+        docs = db.similarity_search(pergunta, k=k)
+        resposta = "\n\n".join(doc.page_content.strip() for doc in docs)
+        return resposta
+    except Exception as e:
+        logger.error(f"Erro ao buscar conhecimento: {e}")
+        return "Não foi possível buscar conhecimento no momento."
 
 # Teste local
 if __name__ == "__main__":
@@ -76,3 +78,4 @@ if __name__ == "__main__":
     print(f"✅ {qtd} registros indexados com sucesso.")
     resultado = buscar_conhecimento("Quais os modelos ideais de canais?")
     print("\n📌 RESPOSTA:\n", resultado)
+
