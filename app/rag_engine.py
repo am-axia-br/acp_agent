@@ -17,7 +17,7 @@ df.columns = [
 
 # Limpar dados
 df = df[df["Municipio"].notna()]
-df = df[~df["Municipio"].astype(str).str.contains("Munic\u00edpios com|Tabela|Total", na=False)]
+df = df[~df["Municipio"].astype(str).str.contains("Municípios com|Tabela|Total", na=False)]
 df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
 df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
 
@@ -45,12 +45,13 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
-# Função de normalização dos segmentos recebidos
+# Normalizar entrada dos segmentos
 def normalizar_segmentos(segmentos: str):
     if isinstance(segmentos, list):
         segmentos = " ".join(segmentos)
     return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
 
+# Encontrar similaridades por semelhança com base em Descricao_CNAE
 def buscar_similares(termo, lista_opcoes, threshold=0.6):
     matches = get_close_matches(termo, lista_opcoes, n=1, cutoff=threshold)
     return matches[0] if matches else termo
