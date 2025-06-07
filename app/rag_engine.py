@@ -3,6 +3,8 @@ logger = get_logger(__name__)
 
 import pandas as pd
 import numpy as np
+import os
+
 from difflib import get_close_matches
 
 # Carregar base de dados do IBGE
