@@ -171,6 +171,11 @@ def gerar_prompt(data):
     conhecimento_servicos = buscar_conhecimento("servicos agregados em canais de vendas")
 
     cidades_df = filtrar_municipios_por_segmento(segmentos_normalizados, top_n=30)
+    
+    for col in ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
+        if col not in cidades_df.columns:
+            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
+
     # Verifica se faltaram cidades
     if len(cidades_df) < 30:
         cidades_existentes = cidades_df["Municipio"].tolist() if "Municipio" in cidades_df.columns else []

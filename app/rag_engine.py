@@ -84,7 +84,7 @@ def normalizar_segmentos(segmentos: str):
         segmentos = " ".join(segmentos)
     return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
 
-def buscar_similares_embedding(termo, descricoes, threshold=0.85):
+def buscar_similares_embedding(termo, descricoes, threshold=0.65):
     try:
         termo_emb = get_embedding(termo)
         if termo_emb is None:
@@ -94,7 +94,17 @@ def buscar_similares_embedding(termo, descricoes, threshold=0.85):
             for descricao in descricoes
         ]
         melhor_match = sorted(scores, key=lambda x: x[1], reverse=True)[0]
-        return melhor_match[0] if melhor_match[1] >= threshold else termo
+        if melhor_match[1] >= threshold:
+            return melhor_match[0]
+
+# Se não atingir o threshold, tenta encontrar algo próximo com fuzzy matching
+
+        alternativas = get_close_matches(termo, descricoes, n=1, cutoff=0.6)
+        if alternativas:
+            return alternativas[0]
+
+        return termo  # ou None, se preferir retornar vazio
+
     except Exception as e:
         logger.error(f"Erro em similaridade por embedding: {e}")
         return termo
@@ -146,6 +156,10 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
                 "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"
             ])
 
+        
+        dados_complementares = simular_populacao_pib(filtrados)
+        final_df = dados_complementares.groupby("Municipio").sum(numeric_only=True).reset_index()
+
         for col in ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
             if col not in final_df.columns:
                 if col == "Municipio":
@@ -153,10 +167,6 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
                 else:
                     final_df[col] = 0
         
-        
-        dados_complementares = simular_populacao_pib(filtrados)
-        final_df = dados_complementares.groupby("Municipio").sum(numeric_only=True).reset_index()
-
         if "Salario_Medio_R$" not in final_df:
             final_df["Salario_Medio_R$"] = np.random.uniform(2000, 8000, size=len(final_df))
 
