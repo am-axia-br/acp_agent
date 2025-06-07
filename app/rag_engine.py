@@ -1,15 +1,16 @@
 from log_config import get_logger
 logger = get_logger(__name__)
 
+from openai import OpenAI
 import pandas as pd
 import numpy as np
 import os
 import json
 import hashlib
-import openai
 from difflib import get_close_matches
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 # Cache para embeddings (para evitar repetição de chamadas)
 embedding_cache_path = "embedding_cache.json"
@@ -25,11 +26,10 @@ def get_embedding(text):
         return EMBEDDING_CACHE[hash_key]
 
     try:
-        response = openai.Embedding.create(
-            input=[text],
-            model="text-embedding-3-small"
-        )
-        embedding = response["data"][0]["embedding"]
+        response = client.embeddings.create(input=[text], model="text-embedding-3-small")
+
+        embedding = response.data[0].embedding
+
         EMBEDDING_CACHE[hash_key] = embedding
 
         # Salvar cache
@@ -146,6 +146,14 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
                 "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"
             ])
 
+        for col in ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
+            if col not in final_df.columns:
+                if col == "Municipio":
+                    final_df[col] = "CidadeDesconhecida"
+                else:
+                    final_df[col] = 0
+        
+        
         dados_complementares = simular_populacao_pib(filtrados)
         final_df = dados_complementares.groupby("Municipio").sum(numeric_only=True).reset_index()
 
