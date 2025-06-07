@@ -170,7 +170,9 @@ def gerar_prompt(data):
     conhecimento_perfis = buscar_conhecimento("perfis e tipos ideais de canais de vendas")
     conhecimento_servicos = buscar_conhecimento("servicos agregados em canais de vendas")
 
-    cidades_df = filtrar_municipios_por_segmento(segmentos_normalizados, top_n=30)
+    segmentos_str = ", ".join(segmentos_normalizados)
+    cidades_df = filtrar_municipios_por_segmentos_multiplos(segmentos_str, top_n=30)
+
     
     for col in ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
         if col not in cidades_df.columns:

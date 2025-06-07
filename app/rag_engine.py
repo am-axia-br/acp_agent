@@ -1,6 +1,8 @@
 from log_config import get_logger
 logger = get_logger(__name__)
 
+import openai
+
 from openai import OpenAI
 import pandas as pd
 import numpy as np
@@ -79,10 +81,13 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
+STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do"}
+
 def normalizar_segmentos(segmentos: str):
     if isinstance(segmentos, list):
         segmentos = " ".join(segmentos)
-    return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
+    return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2 and s.strip().lower() not in STOPWORDS]
+
 
 def buscar_similares_embedding(termo, descricoes, threshold=0.65):
     try:
@@ -118,7 +123,7 @@ def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str]
 Considere segmentos de atuação: {", ".join(segmentos)}.
 Com base nisso, sugira {faltantes} cidades brasileiras com grande potencial de mercado para empresas desses segmentos.
 Evite repetir as cidades já listadas: {", ".join(cidades_existentes)}.
-Liste apenas os nomes das cidades, em uma única linha, separados por vírgula.
+Liste apenas os nomes das cidades, separados por vírgula em uma única linha.
 """
     try:
         resposta = openai.ChatCompletion.create(
@@ -127,13 +132,14 @@ Liste apenas os nomes das cidades, em uma única linha, separados por vírgula.
                 {"role": "system", "content": "Você é um especialista em inteligência de mercado regional brasileiro."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7
+            temperature=0.4
         )
         cidades_sugeridas = resposta['choices'][0]['message']['content']
         return [c.strip() for c in cidades_sugeridas.split(",") if c.strip()]
     except Exception as e:
         logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
         return []
+
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, ordenar_por=None):
     if ordenar_por is None:
