@@ -187,7 +187,19 @@ def gerar_prompt(data):
         cidades_completas = cidades_existentes + cidades_extra[:faltantes]
     
         # Monta novo DataFrame
-        cidades_df = pd.DataFrame({"Municipio": cidades_completas})
+        # Adiciona cidades sugeridas mantendo as colunas obrigatórias
+        
+    if faltantes > 0 and cidades_extra:
+        cidades_df_extra = pd.DataFrame({
+            "Municipio": cidades_extra[:faltantes],
+            "Populacao": [0] * faltantes,
+            "PIB": [0] * faltantes,
+            "Empresas_Segmento": [0] * faltantes,
+            "Empresas_Perfil_Canal": [0] * faltantes,
+            "Salario_Medio_R$": [0] * faltantes
+    })
+            
+    cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
 
     cidades_html = gerar_tabela_html(cidades_df)
 

@@ -89,25 +89,29 @@ def buscar_similares_embedding(termo, descricoes, threshold=0.65):
         termo_emb = get_embedding(termo)
         if termo_emb is None:
             return termo
+
         scores = [
             (descricao, cosine_similarity(termo_emb, get_embedding(descricao)))
             for descricao in descricoes
         ]
+
         melhor_match = sorted(scores, key=lambda x: x[1], reverse=True)[0]
+        
+        # Se passou do threshold, retorna a descrição mais próxima
         if melhor_match[1] >= threshold:
             return melhor_match[0]
-
-# Se não atingir o threshold, tenta encontrar algo próximo com fuzzy matching
-
+        
+        # Caso contrário, tenta fuzzy matching com get_close_matches
         alternativas = get_close_matches(termo, descricoes, n=1, cutoff=0.6)
         if alternativas:
             return alternativas[0]
 
-        return termo  # ou None, se preferir retornar vazio
+        return termo
 
     except Exception as e:
         logger.error(f"Erro em similaridade por embedding: {e}")
         return termo
+
 
 def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str], faltantes: int):
     prompt = f"""
