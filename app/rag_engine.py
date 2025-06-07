@@ -81,7 +81,7 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
-STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do"}
+STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
 def normalizar_segmentos(segmentos: str):
     if isinstance(segmentos, list):
@@ -101,11 +101,14 @@ def buscar_similares_embedding(termo, descricoes, threshold=0.65):
         ]
 
         melhor_match = sorted(scores, key=lambda x: x[1], reverse=True)[0]
-        
+
         # Se passou do threshold, retorna a descrição mais próxima
         if melhor_match[1] >= threshold:
             return melhor_match[0]
-        
+
+        # 🔶 LOG para entender por que não passou no threshold
+        logger.warning(f"Baixa similaridade para termo '{termo}': similaridade {melhor_match[1]:.4f}")
+
         # Caso contrário, tenta fuzzy matching com get_close_matches
         alternativas = get_close_matches(termo, descricoes, n=1, cutoff=0.6)
         if alternativas:

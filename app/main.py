@@ -159,6 +159,9 @@ async def reindexar_rag():
         logger.error(f"Erro na reindexacao do RAG: {str(e)}")
         return {"status": "erro", "mensagem": str(e), "detalhes": traceback.format_exc()}
 
+def truncar_texto(texto, limite=500):
+    return texto[:limite] + "..." if len(texto) > limite else texto
+
 def gerar_prompt(data):
     nome = data["nome"]
     empresa = data["empresa"]
@@ -166,9 +169,15 @@ def gerar_prompt(data):
     segmento_original = respostas[1] if len(respostas) > 1 else ""
     segmentos_normalizados = normalizar_segmentos(segmento_original)
 
-    conhecimento_modelos = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
-    conhecimento_perfis = buscar_conhecimento("perfis e tipos ideais de canais de vendas")
-    conhecimento_servicos = buscar_conhecimento("servicos agregados em canais de vendas")
+    segmento = truncar_texto(respostas[1])
+    clientes = truncar_texto(respostas[2])
+    dores = truncar_texto(respostas[3])
+    produtos = truncar_texto(respostas[5])
+    modelo = truncar_texto(respostas[6])
+
+    conhecimento_modelos = buscar_conhecimento(f"modelos de canais para o segmento {segmento}")
+    conhecimento_perfis = buscar_conhecimento(f"empresas ideais para parcerias em {segmento} como as atendidas ({clientes})")
+    conhecimento_servicos = buscar_conhecimento(f"servicos agregados relevantes para empresas que vendem {produtos} com modelo de negocio {modelo}")
 
     segmentos_str = ", ".join(segmentos_normalizados)
     cidades_df = filtrar_municipios_por_segmento(segmentos_str, top_n=30)
