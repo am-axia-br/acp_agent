@@ -4,34 +4,66 @@ logger = get_logger(__name__)
 import pandas as pd
 import numpy as np
 import os
-
+import json
+import hashlib
+import openai
 from difflib import get_close_matches
 
-# Carregar base de dados do IBGE
-df = pd.read_excel("Tabela 14.xlsx")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Renomear colunas
+# Cache para embeddings (para evitar repetição de chamadas)
+embedding_cache_path = "embedding_cache.json"
+if os.path.exists(embedding_cache_path):
+    with open(embedding_cache_path, "r") as f:
+        EMBEDDING_CACHE = json.load(f)
+else:
+    EMBEDDING_CACHE = {}
+
+def get_embedding(text):
+    hash_key = hashlib.sha256(text.encode()).hexdigest()
+    if hash_key in EMBEDDING_CACHE:
+        return EMBEDDING_CACHE[hash_key]
+
+    try:
+        response = openai.Embedding.create(
+            input=[text],
+            model="text-embedding-3-small"
+        )
+        embedding = response["data"][0]["embedding"]
+        EMBEDDING_CACHE[hash_key] = embedding
+
+        # Salvar cache
+        with open(embedding_cache_path, "w") as f:
+            json.dump(EMBEDDING_CACHE, f)
+
+        return embedding
+    except Exception as e:
+        logger.error(f"Erro ao gerar embedding: {e}")
+        return None
+
+def cosine_similarity(v1, v2):
+    v1 = np.array(v1)
+    v2 = np.array(v2)
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+# Carregar base IBGE
+df = pd.read_excel("Tabela 14.xlsx")
 df.columns = [
     "Municipio", "Codigo_CNAE", "Descricao_CNAE", "Unidades_Locais",
     "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
     "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
 ]
 
-# Limpar dados
 df = df[df["Municipio"].notna()]
 df = df[~df["Municipio"].astype(str).str.contains("Municípios com|Tabela|Total", na=False)]
 df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
 df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
-
-# Converter colunas numéricas
 df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
 df["Salario_Medio_R$"] = pd.to_numeric(df["Salario_Medio_R$"], errors="coerce")
 
-# Simulação de população, PIB e salário
 def simular_populacao_pib(df_segmento):
     municipios = df_segmento["Municipio"].unique()
     empresas = df_segmento.groupby("Municipio")["Unidades_Locais"].sum().values
-
     populacoes = np.clip(np.round(empresas * np.random.uniform(15, 60)).astype(int), 1000, 20_000_000)
     pibs = np.clip(np.round(empresas * np.random.uniform(0.02, 0.08), 2), 0.3, 200.0)
     perfil_canal = np.round(empresas * np.random.uniform(0.1, 0.5)).astype(int)
@@ -47,16 +79,47 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
-# Normalizar entrada dos segmentos
 def normalizar_segmentos(segmentos: str):
     if isinstance(segmentos, list):
         segmentos = " ".join(segmentos)
     return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2]
 
-# Encontrar similaridades por semelhança com base em Descricao_CNAE
-def buscar_similares(termo, lista_opcoes, threshold=0.6):
-    matches = get_close_matches(termo, lista_opcoes, n=1, cutoff=threshold)
-    return matches[0] if matches else termo
+def buscar_similares_embedding(termo, descricoes, threshold=0.85):
+    try:
+        termo_emb = get_embedding(termo)
+        if termo_emb is None:
+            return termo
+        scores = [
+            (descricao, cosine_similarity(termo_emb, get_embedding(descricao)))
+            for descricao in descricoes
+        ]
+        melhor_match = sorted(scores, key=lambda x: x[1], reverse=True)[0]
+        return melhor_match[0] if melhor_match[1] >= threshold else termo
+    except Exception as e:
+        logger.error(f"Erro em similaridade por embedding: {e}")
+        return termo
+
+def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str], faltantes: int):
+    prompt = f"""
+Considere segmentos de atuação: {", ".join(segmentos)}.
+Com base nisso, sugira {faltantes} cidades brasileiras com grande potencial de mercado para empresas desses segmentos.
+Evite repetir as cidades já listadas: {", ".join(cidades_existentes)}.
+Liste apenas os nomes das cidades, em uma única linha, separados por vírgula.
+"""
+    try:
+        resposta = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Você é um especialista em inteligência de mercado regional brasileiro."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        cidades_sugeridas = resposta['choices'][0]['message']['content']
+        return [c.strip() for c in cidades_sugeridas.split(",") if c.strip()]
+    except Exception as e:
+        logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
+        return []
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, ordenar_por=None):
     if ordenar_por is None:
@@ -70,7 +133,7 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
         descricoes_cnae = df["Descricao_CNAE"].dropna().unique().tolist()
 
         for termo in segmentos_lista:
-            termo_similar = buscar_similares(termo, descricoes_cnae)
+            termo_similar = buscar_similares_embedding(termo, descricoes_cnae)
             encontrados = df[df["Descricao_CNAE"].astype(str).str.contains(termo_similar, case=False, na=False)]
             if not encontrados.empty:
                 filtrados = pd.concat([filtrados, encontrados])
@@ -96,16 +159,16 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
             cidades_existentes = final_df["Municipio"].tolist()
             sugestoes_openai = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltam)
 
-        if sugestoes_openai:
-            extras = pd.DataFrame({
-                "Municipio": sugestoes_openai,
-                "Populacao": np.random.randint(1000, 20000000, size=len(sugestoes_openai)),
-                "PIB": np.round(np.random.uniform(0.3, 10.0, size=len(sugestoes_openai)), 2),
-                "Empresas_Segmento": np.random.randint(20, 100, size=len(sugestoes_openai)),
-                "Empresas_Perfil_Canal": np.random.randint(5, 50, size=len(sugestoes_openai)),
-                "Salario_Medio_R$": np.round(np.random.uniform(1800, 3500, size=len(sugestoes_openai)), 2)
-            })
-            final_df = pd.concat([final_df, extras], ignore_index=True)
+            if sugestoes_openai:
+                extras = pd.DataFrame({
+                    "Municipio": sugestoes_openai,
+                    "Populacao": np.random.randint(1000, 20000000, size=len(sugestoes_openai)),
+                    "PIB": np.round(np.random.uniform(0.3, 10.0, size=len(sugestoes_openai)), 2),
+                    "Empresas_Segmento": np.random.randint(20, 100, size=len(sugestoes_openai)),
+                    "Empresas_Perfil_Canal": np.random.randint(5, 50, size=len(sugestoes_openai)),
+                    "Salario_Medio_R$": np.round(np.random.uniform(1800, 3500, size=len(sugestoes_openai)), 2)
+                })
+                final_df = pd.concat([final_df, extras], ignore_index=True)
 
         return final_df.head(top_n)
 
@@ -124,7 +187,6 @@ def gerar_tabela_html(dataframe):
             <p>Revise o segmento informado ou tente outro termo mais genérico.</p>
         </div>
         """
-
     linhas = ""
     for _, row in dataframe.iterrows():
         linhas += (
@@ -158,33 +220,3 @@ def gerar_tabela_html(dataframe):
         </table>
     </div>
     """
-
-def debug_dataframe(df_debug):
-    print("\n[RAG DEBUG] Visualização dos primeiros registros:")
-    print(df_debug.head())
-
-import openai
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str], faltantes: int):
-    prompt = f"""
-Considere segmentos de atuação: {", ".join(segmentos)}.
-Com base nisso, sugira {faltantes} cidades brasileiras com grande potencial de mercado para empresas desses segmentos.
-Evite repetir as cidades já listadas: {", ".join(cidades_existentes)}.
-Liste apenas os nomes das cidades, em uma única linha, separados por vírgula.
-"""
-    try:
-        resposta = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Você é um especialista em inteligência de mercado regional brasileiro."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7
-        )
-        cidades_sugeridas = resposta['choices'][0]['message']['content']
-        return [c.strip() for c in cidades_sugeridas.split(",") if c.strip()]
-    except Exception as e:
-        logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
-        return []
-
