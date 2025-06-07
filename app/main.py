@@ -161,73 +161,102 @@ async def reindexar_rag():
 def gerar_prompt(data):
     nome = data["nome"]
     empresa = data["empresa"]
-    segmento_original = data["diagnostico"][1] if len(data["diagnostico"]) > 1 else ""
+    respostas = data["diagnostico"]
+    segmento_original = respostas[1] if len(respostas) > 1 else ""
     segmentos_normalizados = normalizar_segmentos(segmento_original)
-
-    bloco_respostas = ""
-    for i, resp in enumerate(data["diagnostico"]):
-        bloco_respostas += f"{i+1}) {perguntas[i]} \n{resp}\n\n"
 
     conhecimento_modelos = buscar_conhecimento("modelos de canais de vendas para empresas B2B")
     conhecimento_perfis = buscar_conhecimento("perfis e tipos ideais de canais de vendas")
     conhecimento_servicos = buscar_conhecimento("servicos agregados em canais de vendas")
 
     cidades_df = filtrar_municipios_por_segmento(segmentos_normalizados, top_n=30)
-    if cidades_df.shape[0] < 30:
-        faltando = 30 - cidades_df.shape[0]
-        cidades_fake = [f"CidadeGenerica{i+1}" for i in range(faltando)]
-        for cid in cidades_fake:
-            cidades_df.loc[len(cidades_df)] = [cid, 100000, 10.0, 500, 100, 3000.0]
+    # Verifica se faltaram cidades
+    if len(cidades_df) < 30:
+        cidades_existentes = cidades_df["Municipio"].tolist() if "Municipio" in cidades_df.columns else []
+        faltantes = 30 - len(cidades_existentes)
+        sugestoes = sugerir_cidades_openai(segmentos_normalizados, total_necessario=faltantes)
+    
+        # Garante que não haja duplicadas
+        cidades_extra = [c for c in sugestoes if c not in cidades_existentes]
+        cidades_completas = cidades_existentes + cidades_extra[:faltantes]
+    
+        # Monta novo DataFrame
+        cidades_df = pd.DataFrame({"Municipio": cidades_completas})
+
     cidades_html = gerar_tabela_html(cidades_df)
 
     try:
-        ticket = float(data["diagnostico"][7])
-        ciclo = int(data["diagnostico"][8])
-        novos_clientes = int(data["diagnostico"][9])
+        ticket = float(respostas[7])
+        ciclo = int(respostas[8])
+        novos_clientes = int(respostas[9])
     except Exception as e:
-        logger.error("Erro ao processar valores numericos no prompt")
-        raise ValueError(f"Erro ao converter valores numericos: {str(e)} | ticket={data['diagnostico'][7]}, ciclo={data['diagnostico'][8]}, novos={data['diagnostico'][9]}") from e
+        raise ValueError(f"Erro ao converter valores numericos: {str(e)}") from e
 
-    return f"""
-Resumo do Diagnostico Comercial
+    conversao = 0.2
+    oportunidades = int(novos_clientes / conversao)
+    prospeccoes = int(oportunidades / conversao)
+    receita_mensal = ticket * novos_clientes * 20
+    receita_24_meses = receita_mensal * 24
 
-Ola, {nome},
+    return f'''
+🧠 DIAGNÓSTICO ESTRUTURADO – EMPRESA {empresa.upper()}
 
-Com base nas suas respostas, desenvolvemos abaixo o diagnostico detalhado para sua empresa: {empresa}.
+🔹 Parte 01 – Resumo sobre a empresa:
+{respostas[0]}
 
-Dados analisados:
-{bloco_respostas}
+🔹 Parte 02 – Produtos e Serviços:
+{respostas[5]}
 
-Modelos ideais de canais de vendas:
+🔹 Parte 03 – Perfil dos Clientes atendidos:
+{respostas[2]}
+
+🔹 Parte 04 – Dores e Benefícios:
+{respostas[3]}
+
+🔹 Parte 05 – Modelo de Negócio:
+{respostas[6]}
+
+🔹 Parte 06 – Necessidades de Prospecção:
+Meta Prevista: {novos_clientes} novos clientes/mês
+Ciclo de Venda: {ciclo} dias
+Índice de Conversão: {int(conversao * 100)}%
+Número de Oportunidades: {oportunidades}
+Número de Prospecções: {prospeccoes}
+
+🔹 Parte 07 – Modelos de Parceria:
 {conhecimento_modelos}
 
-Tipos, perfis e perfis ideais:
+🔹 Parte 08 – Perfis de Empresas Parceiras com FIT:
 {conhecimento_perfis}
 
-Servicos agregados para canais:
+🔹 Parte 09 – Serviços Agregados:
 {conhecimento_servicos}
 
+🔹 Parte 10 – Cidades com Potencial:
 {cidades_html}
 
-Projecao de resultados com 20 canais ativos:
-- Ticket Medio: R${ticket:,.2f}
-- Meta Mensal de Novos Clientes por Canal: {novos_clientes} cliente(s)
-- Total de Novos Clientes com 20 Canais: {novos_clientes * 20} clientes
-- Receita Mensal Estimada: R${ticket * novos_clientes * 20:,.2f}
+🔹 Parte 11 – Retorno sobre o Investimento:
+Ticket Médio: R${ticket:,.2f}
+Receita Mensal com 20 canais: R${receita_mensal:,.2f}
+Receita estimada em 24 meses: R${receita_24_meses:,.2f}
 
-Calculo de oportunidades e prospeccoes por canal (base: 20% de conversao):
-- Oportunidades Necessarias por Canal: {int(novos_clientes / 0.2)}
-- Prospeccoes Necessarias por Canal: {int((novos_clientes / 0.2) / 0.2)}
+🔹 Parte 12 – Dicas Estratégicas:
+- Inicie com 3 a 5 canais
+- Forneça treinamentos e acompanhamento semanal
+- Crie campanhas e ações de marketing
+- Corrija falhas com feedback dos canais
 
-Nossa recomendacao e iniciar o onboarding com 3 a 5 canais para validacao.
-"""
+🔹 Parte 13 – Chamada para Ação:
+Sua empresa está pronta para crescer com uma estratégia sólida de canais de vendas.
+Entre em contato com a AC Partners e comece agora o onboarding comercial com especialistas.
+'''
 
 def chamar_llm(prompt):
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Voce e um consultor especialista em canais de vendas."},
+                {"role": "system", "content": "Você é um consultor especialista em canais de vendas. Siga exatamente a estrutura em 13 partes numeradas conforme o prompt, sem pular nenhuma parte."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -237,4 +266,22 @@ def chamar_llm(prompt):
     except Exception as e:
         logger.error("Erro na chamada a API OpenAI")
         raise RuntimeError("Erro na chamada a API OpenAI.") from e
+
+def sugerir_cidades_openai(segmentos, total_necessario=30):
+    try:
+        prompt = f"Liste {total_necessario} cidades brasileiras com potencial de mercado para empresas que atuam nos segmentos: {', '.join(segmentos)}. Considere demanda, perfil econômico, presença de agronegócio, indústria ou comércio local, dependendo do segmento. Forneça apenas os nomes das cidades, uma por linha."
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um analista de inteligência de mercado."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4,
+            max_tokens=800
+        )
+        cidades = resposta.choices[0].message.content.strip().split("\n")
+        return [c.strip().split("-")[0].strip() for c in cidades if c.strip()]
+    except Exception as e:
+        logger.error(f"Erro ao sugerir cidades com OpenAI: {str(e)}")
+        return []
 

@@ -91,13 +91,17 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
 
         if len(final_df) < top_n:
             faltam = top_n - len(final_df)
+            cidades_existentes = final_df["Municipio"].tolist()
+            sugestoes_openai = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltam)
+
+        if sugestoes_openai:
             extras = pd.DataFrame({
-                "Municipio": [f"Cidade Generica {i+1}" for i in range(faltam)],
-                "Populacao": np.random.randint(1000, 20000000, size=faltam),
-                "PIB": np.round(np.random.uniform(0.3, 10.0, size=faltam), 2),
-                "Empresas_Segmento": np.random.randint(20, 100, size=faltam),
-                "Empresas_Perfil_Canal": np.random.randint(5, 50, size=faltam),
-                "Salario_Medio_R$": np.round(np.random.uniform(1800, 3500, size=faltam), 2)
+                "Municipio": sugestoes_openai,
+                "Populacao": np.random.randint(1000, 20000000, size=len(sugestoes_openai)),
+                "PIB": np.round(np.random.uniform(0.3, 10.0, size=len(sugestoes_openai)), 2),
+                "Empresas_Segmento": np.random.randint(20, 100, size=len(sugestoes_openai)),
+                "Empresas_Perfil_Canal": np.random.randint(5, 50, size=len(sugestoes_openai)),
+                "Salario_Medio_R$": np.round(np.random.uniform(1800, 3500, size=len(sugestoes_openai)), 2)
             })
             final_df = pd.concat([final_df, extras], ignore_index=True)
 
@@ -156,4 +160,29 @@ def gerar_tabela_html(dataframe):
 def debug_dataframe(df_debug):
     print("\n[RAG DEBUG] Visualização dos primeiros registros:")
     print(df_debug.head())
+
+import openai
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str], faltantes: int):
+    prompt = f"""
+Considere segmentos de atuação: {", ".join(segmentos)}.
+Com base nisso, sugira {faltantes} cidades brasileiras com grande potencial de mercado para empresas desses segmentos.
+Evite repetir as cidades já listadas: {", ".join(cidades_existentes)}.
+Liste apenas os nomes das cidades, em uma única linha, separados por vírgula.
+"""
+    try:
+        resposta = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Você é um especialista em inteligência de mercado regional brasileiro."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        cidades_sugeridas = resposta['choices'][0]['message']['content']
+        return [c.strip() for c in cidades_sugeridas.split(",") if c.strip()]
+    except Exception as e:
+        logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
+        return []
 
