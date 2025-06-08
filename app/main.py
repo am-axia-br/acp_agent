@@ -155,19 +155,20 @@ async def gerar_diagnostico():
 @app.post("/reset")
 async def resetar_diagnostico():
     global data
-data = {
-    "origem": None,
-    "nome": None,
-    "empresa": None,
-    "whatsapp": None,
-    "email": None,
-    "diagnostico": [],
-    "etapa_atual": 0,
-    "finalizado": False,
-    "iniciado": False,
-    "prompt": None
-}
+    data = {
+        "origem": None,
+        "nome": None,
+        "empresa": None,
+        "whatsapp": None,
+        "email": None,
+        "diagnostico": [],
+        "etapa_atual": 0,
+        "finalizado": False,
+        "iniciado": False,
+        "prompt": None
+    }
     return {"status": "resetado"}
+
 
 @app.post("/reindexar-rag")
 async def reindexar_rag():
