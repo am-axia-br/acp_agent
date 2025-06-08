@@ -16,6 +16,36 @@ from openai import OpenAI
 from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html, normalizar_segmentos
 from rag_parcerias import buscar_conhecimento
 
+def consultar_taxa_conversao_openai(segmentos):
+    try:
+        prompt = f"""Para empresas do segmento {', '.join(segmentos)}, qual é a taxa média de conversão de:
+- Prospecção para oportunidade?
+- Oportunidade para venda?
+Dê um número percentual para cada uma, no Brasil, em mercados B2B."""
+
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um consultor especialista em vendas B2B."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=300
+        )
+        texto = resposta.choices[0].message.content.strip()
+        matches = re.findall(r"(\d{1,2})%", texto)
+        if len(matches) >= 2:
+            p_para_o = int(matches[0]) / 100
+            o_para_v = int(matches[1]) / 100
+            return p_para_o * o_para_v  # taxa final composta
+        else:
+            logger.warning("Taxa de conversão não encontrada, usando padrão 20%")
+            return 0.2
+    except Exception as e:
+        logger.error(f"Erro ao consultar taxa de conversao: {str(e)}")
+        return 0.2
+
+
 def novo_diagnostico():
     return {
         "origem": None,
@@ -195,8 +225,7 @@ def gerar_prompt(data):
     modelo_negocio = respostas[6]
     ticket_medio_str = respostas[7]
     ciclo_vendas = respostas[8]
-    taxa_conversao_str = respostas[9]
-    meta_clientes = respostas[10]
+    meta_clientes = respostas[9]
 
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
     segmentos_normalizados = normalizar_segmentos(segmento_original)
@@ -246,7 +275,8 @@ def gerar_prompt(data):
     except Exception as e:
         raise ValueError(f"Erro ao converter valores numericos: {str(e)}") from e
 
-    conversao = 0.2
+    conversao = consultar_taxa_conversao_openai(segmentos_normalizados)
+
     oportunidades = int(novos_clientes / conversao)
     prospeccoes = int(oportunidades / conversao)
 
