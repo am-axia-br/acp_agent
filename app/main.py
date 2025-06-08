@@ -83,11 +83,11 @@ async def chat(req: Request):
 
     if not data["iniciado"]:
         data["iniciado"] = True
-    return {"mensagem": "Ola... Para comecarmos o diagnostico, me fale o seu nome..."}  # Essa linha continua aqui
+        return {"mensagem": "Ola... Para comecarmos o diagnostico, me fale de onde você fala..."}
 
     if not data["origem"]:
         data["origem"] = msg
-    return {"pergunta": "Qual o seu nome?"}
+        return {"pergunta": "Qual o seu nome?"}
 
     if not data["nome"]:
         data["nome"] = msg
