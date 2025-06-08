@@ -257,9 +257,10 @@ def gerar_prompt(data):
     prospeccoes = int(oportunidades / taxa_pros)
 
 
-    conhecimento_modelos = buscar_conhecimento(f"modelos de canais para o segmento {segmento}")
-    conhecimento_perfis = buscar_conhecimento(f"empresas ideais para parcerias em {segmento} como as atendidas ({clientes})")
-    conhecimento_servicos = buscar_conhecimento(f"servicos agregados relevantes para empresas que vendem {produtos} com modelo de negocio {modelo}")
+    conhecimento_modelos = buscar_conhecimento_complementado(f"Quais modelos de parceria são ideais para empresas como a {empresa}, que atuam com {produtos} no segmento {segmento}?")
+    conhecimento_perfis = buscar_conhecimento_complementado(f"Quais os perfis de empresas parceiras ideais para {empresa}, considerando que seus clientes são como: {clientes}?")
+    conhecimento_servicos = buscar_conhecimento_complementado(f"Que serviços agregados são relevantes para empresas que vendem {produtos}, com modelo de negócio baseado em {modelo}?")
+
 
     segmentos_str = ", ".join(segmentos_normalizados)
     cidades_df = filtrar_municipios_por_segmento(segmentos_str, top_n=30)
@@ -503,3 +504,29 @@ Forneça os dois valores em porcentagem. Exemplo:
     except Exception as e:
         logger.error(f"Erro ao consultar taxas de conversão: {str(e)}")
         return 0.1, 0.2
+
+def buscar_conhecimento_complementado(pergunta: str) -> str:
+    """Consulta o RAG e complementa com a OpenAI para respostas mais completas"""
+    try:
+        resposta_rag = buscar_conhecimento(pergunta, k=3)
+
+        prompt = f"""Você é um consultor de canais de vendas B2B. Responda à pergunta abaixo de forma clara, objetiva e baseada em boas práticas e exemplos do mercado brasileiro.
+
+Pergunta: {pergunta}
+
+A resposta deve ser complementar a este conteúdo já obtido:
+{resposta_rag}
+"""
+        resposta_openai = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um consultor de canais de vendas com experiência em parcerias B2B."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4,
+            max_tokens=600
+        )
+        return f"{resposta_rag}\n\n🔎 Complemento da IA:\n{resposta_openai.choices[0].message.content.strip()}"
+    except Exception as e:
+        logger.warning(f"Erro ao complementar conhecimento com OpenAI: {str(e)}")
+        return buscar_conhecimento(pergunta)
