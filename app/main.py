@@ -34,6 +34,7 @@ def indexar_automaticamente():
         logger.warning(f"Indexacao automatica ignorada: {e}")
 
 data = {
+    "origem": None,
     "nome": None,
     "empresa": None,
     "whatsapp": None,
@@ -45,6 +46,7 @@ data = {
     "prompt": None
 }
 
+
 @app.get("/")
 def home():
     global data
@@ -53,6 +55,7 @@ def home():
     return FileResponse("static/index.html")
 
 @app.get("/chat")
+
 def chat_get():
     return {"erro": "Metodo GET nao permitido nesta rota. Use POST com corpo JSON contendo 'mensagem'."}
 
@@ -80,8 +83,11 @@ async def chat(req: Request):
 
     if not data["iniciado"]:
         data["iniciado"] = True
-        logger.info("Inicio do diagnostico iniciado")
-        return {"mensagem": "Ola... Para comecarmos o diagnostico, me fale o seu nome..."}
+    return {"mensagem": "Ola... Para comecarmos o diagnostico, me fale o seu nome..."}  # Essa linha continua aqui
+
+    if not data["origem"]:
+        data["origem"] = msg
+    return {"pergunta": "Qual o seu nome?"}
 
     if not data["nome"]:
         data["nome"] = msg
@@ -120,8 +126,8 @@ async def chat(req: Request):
         if data["etapa_atual"] < len(perguntas):
             return {"pergunta": perguntas[data["etapa_atual"]]}
         else:
-            if len(data["diagnostico"]) < 11:
-                logger.error("Diagnóstico incompleto. Esperado 11 respostas.")
+            if len(data["diagnostico"]) < len(perguntas):
+                logger.error("Diagnóstico incompleto. Esperado respostas.")
                 return {"mensagem": "Erro: Respostas incompletas. Por favor, reinicie o diagnóstico.", "resumo": "Erro: respostas insuficientes.", "email": data["email"]}
             try:
                 prompt = gerar_prompt(data)
@@ -149,8 +155,18 @@ async def gerar_diagnostico():
 @app.post("/reset")
 async def resetar_diagnostico():
     global data
-    data = {"nome": None, "empresa": None, "whatsapp": None, "email": None, "diagnostico": [], "etapa_atual": 0, "finalizado": False, "iniciado": False, "prompt": None}
-    logger.info("Diagnostico resetado pelo usuario")
+data = {
+    "origem": None,
+    "nome": None,
+    "empresa": None,
+    "whatsapp": None,
+    "email": None,
+    "diagnostico": [],
+    "etapa_atual": 0,
+    "finalizado": False,
+    "iniciado": False,
+    "prompt": None
+}
     return {"status": "resetado"}
 
 @app.post("/reindexar-rag")
@@ -168,6 +184,8 @@ def truncar_texto(texto, limite=500):
     return texto[:limite] + "..." if len(texto) > limite else texto
 
 def gerar_prompt(data):
+
+    origem = data.get("origem", "")
     nome = data["nome"]
     empresa = data["empresa"]
     respostas = data["diagnostico"]
@@ -252,6 +270,9 @@ def gerar_prompt(data):
 
     return f'''
 🧠 DIAGNÓSTICO ESTRUTURADO – EMPRESA {empresa.upper()}
+
+🔹 Local informado:
+{origem}
 
 🔹 Parte 01 – Resumo sobre a empresa:
 {site}
