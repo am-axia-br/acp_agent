@@ -203,22 +203,27 @@ def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str]
 Considere segmentos de atuação: {", ".join(segmentos)}.
 Com base nisso, sugira {faltantes} cidades brasileiras com grande potencial de mercado para empresas desses segmentos.
 Evite repetir as cidades já listadas: {", ".join(cidades_existentes)}.
-Liste apenas os nomes das cidades, separados por vírgula em uma única linha.
-"""
+Para cada cidade, retorne: Nome da Cidade, Estado, População, PIB estimado, Número de empresas no segmento, Número de empresas com perfil para ser canal.
+Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PIB, Empresas_Segmento, Empresas_Perfil_Canal
+    """
     try:
-        resposta = openai.ChatCompletion.create(
-            model="gpt-4",
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Você é um especialista em inteligência de mercado regional brasileiro."},
+                {"role": "system", "content": "Você é um analista de inteligência de mercado brasileiro."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.4
+            temperature=0.4,
+            max_tokens=1200
         )
-        cidades_sugeridas = resposta['choices'][0]['message']['content']
-        return [c.strip() for c in cidades_sugeridas.split(",") if c.strip()]
+        import io
+        tabela_csv = resposta.choices[0].message.content.strip()
+        df = pd.read_csv(io.StringIO(tabela_csv))
+        return df
     except Exception as e:
         logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
-        return []
+        return pd.DataFrame()
+
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
     descricoes_cnae = raw_df["Descricao_CNAE"].dropna().unique().tolist()

@@ -280,9 +280,40 @@ def gerar_prompt(data):
     if len(cidades_df) < 30:
         cidades_existentes = cidades_df["Municipio"].tolist() if "Municipio" in cidades_df.columns else []
         faltantes = 30 - len(cidades_existentes)
-        sugestoes = sugerir_cidades_openai(segmentos_normalizados, total_necessario=faltantes)
+        cidades_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
+        cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
+        cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
 
-        cidades_extra = [c for c in sugestoes if c not in cidades_existentes]
+    if len(cidades_df) < 30:
+        logger.warning(f"Apenas {len(cidades_df)} cidades foram obtidas. Preenchendo com cidades fictícias.")
+        for i in range(30 - len(cidades_df)):
+            cidades_df.loc[len(cidades_df)] = {
+                "Municipio": f"CidadeFicticia{i+1}",
+                "Estado": "XX",
+                "Populacao": 0,
+                "PIB": 0,
+                "Empresas_Segmento": 0,
+                "Empresas_Perfil_Canal": 0
+        }
+
+        cidades_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
+
+        cidades_df = pd.concat([cidades_df, cidades_extra], ignore_index=True)
+
+        if len(cidades_df) < 30:
+            logger.warning(f"Apenas {len(cidades_df)} cidades foram obtidas. Preenchendo com cidades fictícias.")
+            for i in range(30 - len(cidades_df)):
+                cidades_df.loc[len(cidades_df)] = {
+                    "Municipio": f"CidadeFicticia{i+1}",
+                    "Estado": "XX",
+                    "Populacao": 0,
+                    "PIB": 0,
+                    "Empresas_Segmento": 0,
+                    "Empresas_Perfil_Canal": 0
+        }
+
+        cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
+
         cidades_completas = cidades_existentes + cidades_extra[:faltantes]
 
         if faltantes > 0 and cidades_extra:
