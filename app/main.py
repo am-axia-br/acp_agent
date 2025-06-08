@@ -166,14 +166,28 @@ def gerar_prompt(data):
     nome = data["nome"]
     empresa = data["empresa"]
     respostas = data["diagnostico"]
-    segmento_original = respostas[1] if len(respostas) > 1 else ""
+
+    # Variáveis nomeadas para facilitar a leitura e permitir uso em perguntas dinâmicas
+    site = respostas[0]
+    segmentos_raw = respostas[1]
+    clientes = respostas[2]
+    dores = respostas[3]
+    diferenciais = respostas[4]
+    produtos = respostas[5]
+    modelo_negocio = respostas[6]
+    ticket_medio_str = respostas[7]
+    ciclo_vendas = respostas[8]
+    taxa_conversao_str = respostas[9]
+    meta_clientes = respostas[10]
+
+    segmento_original = segmentos_raw if len(respostas) > 1 else ""
     segmentos_normalizados = normalizar_segmentos(segmento_original)
 
-    segmento = truncar_texto(respostas[1])
-    clientes = truncar_texto(respostas[2])
-    dores = truncar_texto(respostas[3])
-    produtos = truncar_texto(respostas[5])
-    modelo = truncar_texto(respostas[6])
+    segmento = truncar_texto(segmentos_raw)
+    clientes = truncar_texto(clientes)
+    dores = truncar_texto(dores)
+    produtos = truncar_texto(produtos)
+    modelo = truncar_texto(modelo_negocio)
 
     conhecimento_modelos = buscar_conhecimento(f"modelos de canais para o segmento {segmento}")
     conhecimento_perfis = buscar_conhecimento(f"empresas ideais para parcerias em {segmento} como as atendidas ({clientes})")
@@ -182,68 +196,72 @@ def gerar_prompt(data):
     segmentos_str = ", ".join(segmentos_normalizados)
     cidades_df = filtrar_municipios_por_segmento(segmentos_str, top_n=30)
 
-    
     for col in ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
         if col not in cidades_df.columns:
             cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
 
-    # Verifica se faltaram cidades
     if len(cidades_df) < 30:
         cidades_existentes = cidades_df["Municipio"].tolist() if "Municipio" in cidades_df.columns else []
         faltantes = 30 - len(cidades_existentes)
         sugestoes = sugerir_cidades_openai(segmentos_normalizados, total_necessario=faltantes)
-    
-        # Garante que não haja duplicadas
+
         cidades_extra = [c for c in sugestoes if c not in cidades_existentes]
         cidades_completas = cidades_existentes + cidades_extra[:faltantes]
-    
-        # Monta novo DataFrame
-        # Adiciona cidades sugeridas mantendo as colunas obrigatórias
-        
-    if faltantes > 0 and cidades_extra:
-        cidades_df_extra = pd.DataFrame({
-            "Municipio": cidades_extra[:faltantes],
-            "Populacao": [0] * faltantes,
-            "PIB": [0] * faltantes,
-            "Empresas_Segmento": [0] * faltantes,
-            "Empresas_Perfil_Canal": [0] * faltantes,
-            "Salario_Medio_R$": [0] * faltantes
-    })
-            
-    cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
+
+        if faltantes > 0 and cidades_extra:
+            cidades_df_extra = pd.DataFrame({
+                "Municipio": cidades_extra[:faltantes],
+                "Populacao": [0] * faltantes,
+                "PIB": [0] * faltantes,
+                "Empresas_Segmento": [0] * faltantes,
+                "Empresas_Perfil_Canal": [0] * faltantes,
+                "Salario_Medio_R$": [0] * faltantes
+            })
+            cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
 
     cidades_html = gerar_tabela_html(cidades_df)
 
     try:
-        ticket = float(respostas[7])
-        ciclo = int(respostas[8])
-        novos_clientes = int(respostas[9])
+        ticket = float(ticket_medio_str)
+        ciclo = int(ciclo_vendas)
+        novos_clientes = int(meta_clientes)
     except Exception as e:
         raise ValueError(f"Erro ao converter valores numericos: {str(e)}") from e
 
     conversao = 0.2
     oportunidades = int(novos_clientes / conversao)
     prospeccoes = int(oportunidades / conversao)
-    receita_mensal = ticket * novos_clientes * 20
-    receita_24_meses = receita_mensal * 24
+
+    # Novo cálculo: Receita acumulada com canais ativando 1 por mês
+    from datetime import datetime, timedelta
+    receita_24_meses = 0
+    hoje = datetime.today()
+
+    for canal_index in range(20):  # Máximo de 20 canais
+        dias_ate_primeira_venda = 90 + ciclo + (canal_index * 30)
+        data_primeira_venda = hoje + timedelta(days=dias_ate_primeira_venda)
+        meses_restantes = max(0, 24 - ((data_primeira_venda - hoje).days // 30))
+        receita_24_meses += ticket * meses_restantes
+
+    receita_mensal = ticket * novos_clientes * 20  # Receita "cheia" hipotética
 
     return f'''
 🧠 DIAGNÓSTICO ESTRUTURADO – EMPRESA {empresa.upper()}
 
 🔹 Parte 01 – Resumo sobre a empresa:
-{respostas[0]}
+{site}
 
 🔹 Parte 02 – Produtos e Serviços:
-{respostas[5]}
+{produtos}
 
 🔹 Parte 03 – Perfil dos Clientes atendidos:
-{respostas[2]}
+{clientes}
 
 🔹 Parte 04 – Dores e Benefícios:
-{respostas[3]}
+{dores}
 
 🔹 Parte 05 – Modelo de Negócio:
-{respostas[6]}
+{modelo_negocio}
 
 🔹 Parte 06 – Necessidades de Prospecção:
 Meta Prevista: {novos_clientes} novos clientes/mês
@@ -279,6 +297,7 @@ Receita estimada em 24 meses: R${receita_24_meses:,.2f}
 Sua empresa está pronta para crescer com uma estratégia sólida de canais de vendas.
 Entre em contato com a AC Partners e comece agora o onboarding comercial com especialistas.
 '''
+
 
 def chamar_llm(prompt):
     try:

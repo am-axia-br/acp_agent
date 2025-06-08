@@ -2,7 +2,6 @@ from log_config import get_logger
 logger = get_logger(__name__)
 
 import openai
-
 from openai import OpenAI
 import pandas as pd
 import numpy as np
@@ -13,8 +12,7 @@ from difflib import get_close_matches
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
-# Cache para embeddings (para evitar repetição de chamadas)
+# Cache para embeddings
 embedding_cache_path = "embedding_cache.json"
 if os.path.exists(embedding_cache_path):
     with open(embedding_cache_path, "r") as f:
@@ -26,18 +24,12 @@ def get_embedding(text):
     hash_key = hashlib.sha256(text.encode()).hexdigest()
     if hash_key in EMBEDDING_CACHE:
         return EMBEDDING_CACHE[hash_key]
-
     try:
         response = client.embeddings.create(input=[text], model="text-embedding-3-small")
-
         embedding = response.data[0].embedding
-
         EMBEDDING_CACHE[hash_key] = embedding
-
-        # Salvar cache
         with open(embedding_cache_path, "w") as f:
             json.dump(EMBEDDING_CACHE, f)
-
         return embedding
     except Exception as e:
         logger.error(f"Erro ao gerar embedding: {e}")
@@ -48,20 +40,29 @@ def cosine_similarity(v1, v2):
     v2 = np.array(v2)
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
-# Carregar base IBGE
-df = pd.read_excel("Tabela 14.xlsx")
-df.columns = [
+# Lê todas as abas do arquivo Excel
+all_sheets = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
+raw_df = pd.concat(all_sheets.values(), ignore_index=True)
+
+raw_df.columns = [
     "Municipio", "Codigo_CNAE", "Descricao_CNAE", "Unidades_Locais",
     "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
     "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
 ]
 
-df = df[df["Municipio"].notna()]
-df = df[~df["Municipio"].astype(str).str.contains("Municípios com|Tabela|Total", na=False)]
-df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
-df = df[df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
-df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
-df["Salario_Medio_R$"] = pd.to_numeric(df["Salario_Medio_R$"], errors="coerce")
+raw_df = raw_df[raw_df["Municipio"].notna()]
+raw_df = raw_df[~raw_df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
+raw_df = raw_df[~raw_df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
+raw_df = raw_df[raw_df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
+raw_df["Unidades_Locais"] = pd.to_numeric(raw_df["Unidades_Locais"], errors="coerce")
+raw_df["Salario_Medio_R$"] = pd.to_numeric(raw_df["Salario_Medio_R$"], errors="coerce")
+
+STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
+
+def normalizar_segmentos(segmentos: str):
+    if isinstance(segmentos, list):
+        segmentos = " ".join(segmentos)
+    return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2 and s.strip().lower() not in STOPWORDS]
 
 def simular_populacao_pib(df_segmento):
     municipios = df_segmento["Municipio"].unique()
@@ -81,14 +82,6 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
-STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
-
-def normalizar_segmentos(segmentos: str):
-    if isinstance(segmentos, list):
-        segmentos = " ".join(segmentos)
-    return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2 and s.strip().lower() not in STOPWORDS]
-
-
 def buscar_similares_embedding(termo, descricoes, threshold=0.65):
     try:
         termo_emb = get_embedding(termo)
@@ -101,25 +94,18 @@ def buscar_similares_embedding(termo, descricoes, threshold=0.65):
         ]
 
         melhor_match = sorted(scores, key=lambda x: x[1], reverse=True)[0]
-
-        # Se passou do threshold, retorna a descrição mais próxima
         if melhor_match[1] >= threshold:
             return melhor_match[0]
 
-        # 🔶 LOG para entender por que não passou no threshold
         logger.warning(f"Baixa similaridade para termo '{termo}': similaridade {melhor_match[1]:.4f}")
-
-        # Caso contrário, tenta fuzzy matching com get_close_matches
         alternativas = get_close_matches(termo, descricoes, n=1, cutoff=0.6)
         if alternativas:
             return alternativas[0]
 
         return termo
-
     except Exception as e:
         logger.error(f"Erro em similaridade por embedding: {e}")
         return termo
-
 
 def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str], faltantes: int):
     prompt = f"""
@@ -143,51 +129,32 @@ Liste apenas os nomes das cidades, separados por vírgula em uma única linha.
         logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
         return []
 
-
-def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, ordenar_por=None):
-    if ordenar_por is None:
-        ordenar_por = ["Empresas_Segmento", "Salario_Medio_R$"]
-
+def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
     segmentos_lista = normalizar_segmentos(segmentos)
     logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
 
     try:
         filtrados = pd.DataFrame()
-        descricoes_cnae = df["Descricao_CNAE"].dropna().unique().tolist()
+        descricoes_cnae = raw_df["Descricao_CNAE"].dropna().unique().tolist()
 
         for termo in segmentos_lista:
             termo_similar = buscar_similares_embedding(termo, descricoes_cnae)
-            encontrados = df[df["Descricao_CNAE"].astype(str).str.contains(termo_similar, case=False, na=False)]
+            encontrados = raw_df[raw_df["Descricao_CNAE"].astype(str).str.contains(termo_similar, case=False, na=False)]
             if not encontrados.empty:
                 filtrados = pd.concat([filtrados, encontrados])
             else:
                 logger.warning(f"Segmento '{termo}' nao encontrado no RAG.")
 
         if filtrados.empty:
-            return pd.DataFrame(columns=[
-                "Municipio", "Populacao", "PIB",
-                "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"
-            ])
+            return pd.DataFrame(columns=["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"])
 
-        
         dados_complementares = simular_populacao_pib(filtrados)
         final_df = dados_complementares.groupby("Municipio").sum(numeric_only=True).reset_index()
-
-        for col in ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
-            if col not in final_df.columns:
-                if col == "Municipio":
-                    final_df[col] = "CidadeDesconhecida"
-                else:
-                    final_df[col] = 0
-        
-        if "Salario_Medio_R$" not in final_df:
-            final_df["Salario_Medio_R$"] = np.random.uniform(2000, 8000, size=len(final_df))
-
-        final_df = final_df.sort_values(by=ordenar_por, ascending=False).reset_index(drop=True)
+        final_df = final_df.sort_values(by="Empresas_Segmento", ascending=False).head(top_n)
 
         if len(final_df) < top_n:
-            faltam = top_n - len(final_df)
             cidades_existentes = final_df["Municipio"].tolist()
+            faltam = top_n - len(final_df)
             sugestoes_openai = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltam)
 
             if sugestoes_openai:
@@ -205,10 +172,7 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30, 
 
     except Exception as e:
         logger.error(f"Erro ao processar segmentos '{segmentos}': {e}")
-        return pd.DataFrame(columns=[
-            "Municipio", "Populacao", "PIB",
-            "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"
-        ])
+        return pd.DataFrame(columns=["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"])
 
 def gerar_tabela_html(dataframe):
     if dataframe.empty:
