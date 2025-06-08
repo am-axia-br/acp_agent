@@ -176,7 +176,10 @@ def normalizar_segmentos_inteligente(termo_usuario, descricoes_cnae, embeddings_
         emb_termo = get_embedding(termo)
         similaridades = [np.dot(emb_termo, e) for e in embeddings_cnae]
         top_indices = np.argsort(similaridades)[::-1][:5]
-        top_descricoes = [descricoes_cnae[i] for i in top_indices if similaridades[i] > 0.70]
+        top_descricoes = [descricoes_cnae[i] for i in top_indices if similaridades[i] > 0.30]
+        if not top_descricoes:
+            top_descricoes = [descricoes_cnae[top_indices[0]]]
+
         if top_descricoes:
             return top_descricoes
     except:
