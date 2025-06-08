@@ -16,6 +16,23 @@ from openai import OpenAI
 from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html, normalizar_segmentos
 from rag_parcerias import buscar_conhecimento
 
+def novo_diagnostico():
+    return {
+        "origem": None,
+        "nome": None,
+        "empresa": None,
+        "whatsapp": None,
+        "email": None,
+        "diagnostico": [],
+        "etapa_atual": 0,
+        "finalizado": False,
+        "iniciado": False,
+        "prompt": None
+    }
+
+data = novo_diagnostico()
+
+
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -33,24 +50,13 @@ def indexar_automaticamente():
     except Exception as e:
         logger.warning(f"Indexacao automatica ignorada: {e}")
 
-data = {
-    "origem": None,
-    "nome": None,
-    "empresa": None,
-    "whatsapp": None,
-    "email": None,
-    "diagnostico": [],
-    "etapa_atual": 0,
-    "finalizado": False,
-    "iniciado": False,
-    "prompt": None
-}
+data = novo_diagnostico
 
 
 @app.get("/")
 def home():
     global data
-    data = {"nome": None, "empresa": None, "whatsapp": None, "email": None, "diagnostico": [], "etapa_atual": 0, "finalizado": False, "iniciado": False, "prompt": None}
+    data = novo_diagnostico()
     logger.info("Pagina inicial acessada e dados resetados")
     return FileResponse("static/index.html")
 
@@ -85,7 +91,7 @@ async def chat(req: Request):
         data["iniciado"] = True
         return {"mensagem": "Ola... Para comecarmos o diagnostico, me fale de onde você fala..."}
 
-    if not data["origem"]:
+    if not data.get("origem"):
         data["origem"] = msg
         return {"pergunta": "Qual o seu nome?"}
 
@@ -155,18 +161,7 @@ async def gerar_diagnostico():
 @app.post("/reset")
 async def resetar_diagnostico():
     global data
-    data = {
-        "origem": None,
-        "nome": None,
-        "empresa": None,
-        "whatsapp": None,
-        "email": None,
-        "diagnostico": [],
-        "etapa_atual": 0,
-        "finalizado": False,
-        "iniciado": False,
-        "prompt": None
-    }
+    data = novo_diagnostico()
     return {"status": "resetado"}
 
 
