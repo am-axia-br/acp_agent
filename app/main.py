@@ -244,16 +244,17 @@ def gerar_prompt(data):
 
     taxa_pros, taxa_vendas = consultar_taxas_software_b2b()
 
-try:
-    novos_clientes = int(meta_clientes)
-    ciclo = int(ciclo_vendas)
-except:
-    novos_clientes = 1
-    ciclo = 90
+    try:
+        novos_clientes = int(meta_clientes)
+        ciclo = int(ciclo_vendas)
+    except:
+        novos_clientes = 1
+        ciclo = 90
 
 # Cálculo reverso baseado nas taxas
-oportunidades = int(novos_clientes / taxa_vendas)
-prospeccoes = int(oportunidades / taxa_pros)
+
+    oportunidades = int(novos_clientes / taxa_vendas)
+    prospeccoes = int(oportunidades / taxa_pros)
 
 
     conhecimento_modelos = buscar_conhecimento(f"modelos de canais para o segmento {segmento}")
