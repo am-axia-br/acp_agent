@@ -114,10 +114,15 @@ async def chat(req: Request):
             msg = valor
 
         data["diagnostico"].append(msg)
+        logger.info(f"Respostas coletadas até agora: {len(data['diagnostico'])}")
+
         data["etapa_atual"] += 1
         if data["etapa_atual"] < len(perguntas):
             return {"pergunta": perguntas[data["etapa_atual"]]}
         else:
+            if len(data["diagnostico"]) < 11:
+                logger.error("Diagnóstico incompleto. Esperado 11 respostas.")
+                return {"mensagem": "Erro: Respostas incompletas. Por favor, reinicie o diagnóstico.", "resumo": "Erro: respostas insuficientes.", "email": data["email"]}
             try:
                 prompt = gerar_prompt(data)
                 data["prompt"] = prompt
