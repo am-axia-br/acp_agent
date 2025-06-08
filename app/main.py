@@ -238,6 +238,24 @@ def gerar_prompt(data):
     produtos = truncar_texto(produtos)
     modelo = truncar_texto(modelo_negocio)
 
+    resumo_empresa = detalhar_empresa_openai(site, empresa)
+    resumo_produto = detalhar_produto_openai(produtos, segmento)
+    resumo_clientes = detalhar_clientes_openai(clientes)
+
+    taxa_pros, taxa_vendas = consultar_taxas_software_b2b()
+
+try:
+    novos_clientes = int(meta_clientes)
+    ciclo = int(ciclo_vendas)
+except:
+    novos_clientes = 1
+    ciclo = 90
+
+# Cálculo reverso baseado nas taxas
+oportunidades = int(novos_clientes / taxa_vendas)
+prospeccoes = int(oportunidades / taxa_pros)
+
+
     conhecimento_modelos = buscar_conhecimento(f"modelos de canais para o segmento {segmento}")
     conhecimento_perfis = buscar_conhecimento(f"empresas ideais para parcerias em {segmento} como as atendidas ({clientes})")
     conhecimento_servicos = buscar_conhecimento(f"servicos agregados relevantes para empresas que vendem {produtos} com modelo de negocio {modelo}")
@@ -267,6 +285,8 @@ def gerar_prompt(data):
                 "Salario_Medio_R$": [0] * faltantes
             })
             cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
+            cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
+
 
     cidades_html = gerar_tabela_html(cidades_df)
 
@@ -302,13 +322,13 @@ def gerar_prompt(data):
 {origem}
 
 🔹 Parte 01 – Resumo sobre a empresa:
-{site}
+{resumo_empresa}
 
 🔹 Parte 02 – Produtos e Serviços:
-{produtos}
+{resumo_produto}
 
 🔹 Parte 03 – Perfil dos Clientes atendidos:
-{clientes}
+{resumo_clientes}
 
 🔹 Parte 04 – Dores e Benefícios:
 {dores}
@@ -317,11 +337,13 @@ def gerar_prompt(data):
 {modelo_negocio}
 
 🔹 Parte 06 – Necessidades de Prospecção:
-Meta Prevista: {novos_clientes} novos clientes/mês
-Ciclo de Venda: {ciclo} dias
-Índice de Conversão: {int(conversao * 100)}%
-Número de Oportunidades: {oportunidades}
-Número de Prospecções: {prospeccoes}
+- Meta Prevista: {novos_clientes} novo cliente/mês  
+- Ciclo de Venda: {ciclo} dias  
+- Índice de Conversão de Prospecção em Oportunidade: {int(taxa_pros * 100)}%  
+- Número de Prospecções: {prospeccoes:,}  
+- Índice de Conversão de Oportunidades em Vendas: {int(taxa_vendas * 100)}%  
+- Número de Oportunidades: {oportunidades:,}
+
 
 🔹 Parte 07 – Modelos de Parceria:
 {conhecimento_modelos}
@@ -386,3 +408,97 @@ def sugerir_cidades_openai(segmentos, total_necessario=30):
         logger.error(f"Erro ao sugerir cidades com OpenAI: {str(e)}")
         return []
 
+def detalhar_empresa_openai(site, nome_empresa):
+    try:
+        prompt = f"""
+Você é um redator técnico. Com base no nome da empresa "{nome_empresa}" e no site "{site}", gere um resumo claro, profissional e objetivo sobre a empresa. Destaque o segmento de atuação, diferenciais e áreas atendidas.
+Use no máximo 3 frases.
+"""
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um redator corporativo especializado em empresas B2B."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4
+        )
+        return resposta.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Erro ao detalhar empresa: {str(e)}")
+        return f"Para mais informações, visite [{nome_empresa}]({site})."
+
+def detalhar_produto_openai(produto_texto, segmento):
+    try:
+        prompt = f"""
+Explique de forma clara e profissional o seguinte produto ou solução voltado ao segmento {segmento}: "{produto_texto}".
+Gere 2 frases destacando utilidade e valor estratégico para empresas B2B.
+"""
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um especialista em posicionamento de soluções B2B."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4
+        )
+        return resposta.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Erro ao detalhar produto: {str(e)}")
+        return produto_texto
+
+def detalhar_clientes_openai(clientes_lista):
+    try:
+        prompt = f"""
+Gere um parágrafo curto sobre o perfil dos seguintes clientes atendidos atualmente:
+{clientes_lista}
+Mostre diversidade, relevância setorial e valor estratégico.
+"""
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um analista de portfólio de clientes B2B."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4
+        )
+        return resposta.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Erro ao detalhar clientes: {str(e)}")
+        return clientes_lista
+
+def consultar_taxas_software_b2b():
+    prompt = """
+No mercado brasileiro de software B2B:
+
+1. Qual é a taxa média de conversão de prospecções em oportunidades comerciais?
+2. Qual é a taxa média de conversão de oportunidades em vendas fechadas?
+
+Forneça os dois valores em porcentagem. Exemplo:
+- Prospecção para Oportunidade: 10%
+- Oportunidade para Venda: 20%
+"""
+    try:
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um especialista em dados de mercado e vendas B2B."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3
+        )
+        texto = resposta.choices[0].message.content.strip()
+        logger.info(f"Resposta OpenAI sobre conversão: {texto}")
+
+        import re
+        matches = re.findall(r"(\d{1,3})%", texto)
+
+        if len(matches) >= 2:
+            taxa_prospeccao = int(matches[0]) / 100
+            taxa_vendas = int(matches[1]) / 100
+            return taxa_prospeccao, taxa_vendas
+        else:
+            logger.warning("Não foi possível extrair as duas taxas. Usando padrão.")
+            return 0.1, 0.2
+    except Exception as e:
+        logger.error(f"Erro ao consultar taxas de conversão: {str(e)}")
+        return 0.1, 0.2
