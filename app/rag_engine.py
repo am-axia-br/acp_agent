@@ -59,6 +59,62 @@ raw_df["Salario_Medio_R$"] = pd.to_numeric(raw_df["Salario_Medio_R$"], errors="c
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
+equivalencias_semanticas = {
+    "agronegócio": ["agropecuária", "agricultura", "pecuária", "produção rural", "cultivo", "plantação", "fazenda"],
+    "alimentício": ["alimentos", "indústria de alimentos", "bebidas", "fabricação de alimentos", "comida", "processamento alimentar"],
+    "logística": ["transporte", "armazenagem", "distribuição", "frete", "entrega", "supply chain", "cadeia logística"],
+    "varejo": ["comércio varejista", "lojas", "shopping", "ponto de venda", "pdv", "retail", "comércio"],
+    "atacado": ["comércio atacadista", "distribuidor", "distribuição em massa", "atacadista"],
+    "farmacêutico": ["remédios", "medicamentos", "farmácias", "indústria farmacêutica", "saúde", "laboratório"],
+    "hospitalar": ["hospitais", "clínicas", "saúde", "unidade de saúde", "UPA", "postos de saúde", "pronto socorro"],
+    "construção civil": ["obras", "empreiteira", "construtora", "infraestrutura", "engenharia civil", "imóveis em construção"],
+    "imobiliário": ["imóveis", "incorporadora", "construtora", "venda de imóveis", "locação de imóveis"],
+    "financeiro": ["finanças", "bancos", "meios de pagamento", "instituições financeiras", "cooperativa de crédito"],
+    "seguros": ["corretora", "plano de saúde", "seguradora", "seguro de vida", "auto", "patrimônio"],
+    "automotivo": ["carros", "veículos", "oficinas", "autopeças", "montadoras", "revendedoras"],
+    "educação": ["escolas", "ensino", "universidade", "colégio", "faculdade", "instituições de ensino"],
+    "tecnologia": ["TI", "software", "hardware", "sistemas", "desenvolvimento de software", "startups"],
+    "indústria têxtil": ["tecidos", "malharia", "confecção", "roupas", "vestuário", "moda"],
+    "calçadista": ["sapatos", "calçados", "fabricação de calçados"],
+    "cosméticos": ["beleza", "perfumes", "estética", "cuidados pessoais", "produtos de beleza"],
+    "mineração": ["mineradora", "extração mineral", "bauxita", "ferro", "minério", "carvão"],
+    "siderurgia": ["aço", "metalurgia", "fundições", "laminação de aço", "indústria do aço"],
+    "químico": ["produtos químicos", "solventes", "resinas", "indústria química"],
+    "plástico": ["indústria plástica", "embalagens plásticas", "injetoras", "extrusoras"],
+    "embalagens": ["packaging", "caixas", "rótulos", "frascos", "embalagens em geral"],
+    "papel e celulose": ["papel", "indústria de papel", "fábricas de papel", "papelão", "celulose"],
+    "editorial": ["gráfica", "editoras", "livros", "publicações", "revistas", "jornais"],
+    "energia": ["usinas", "distribuidoras de energia", "solar", "eólica", "hidrelétrica", "geração de energia"],
+    "telecomunicações": ["telefonia", "internet", "provedores", "infraestrutura de redes", "operadoras"],
+    "limpeza": ["produtos de limpeza", "higiene", "desinfetantes", "sanitização"],
+    "condomínios": ["síndico", "gestão condominial", "residenciais", "condomínios empresariais"],
+    "hotelaria": ["hotéis", "resorts", "pousadas", "turismo", "hospitalidade"],
+    "turismo": ["agências", "viagens", "pacotes turísticos", "guias turísticos"],
+    "transportes": ["fretamento", "rodoviário", "ferroviário", "marítimo", "logística", "entregas"],
+    "aeronáutico": ["aviões", "manutenção de aeronaves", "aeroportos", "aeronaves", "fabricantes de aeronaves"],
+    "naval": ["indústria naval", "embarcações", "estaleiros", "transporte marítimo"],
+    "mecânico": ["usinagem", "autopeças", "componentes mecânicos", "mecânica industrial"],
+    "metalúrgico": ["fundições", "soldagem", "indústria de metais", "usinagem"],
+    "moveleiro": ["móveis", "marcenaria", "indústria de móveis", "design de interiores"],
+    "frigorífico": ["carnes", "processamento de alimentos", "abatedouros", "resfriados"],
+    "bebidas": ["cervejarias", "refrigerantes", "água", "vinhos", "indústria de bebidas"],
+    "meio ambiente": ["resíduos", "coleta seletiva", "tratamento de água", "energia renovável", "reciclagem"],
+    "segurança": ["monitoramento", "portaria", "segurança patrimonial", "vigilância", "alarmistas"],
+    "RH": ["recrutamento", "recursos humanos", "terceirização de mão de obra", "gestão de talentos"],
+    "jurídico": ["advocacia", "escritório de advocacia", "consultoria jurídica"],
+    "contábil": ["contabilidade", "escritórios contábeis", "consultoria tributária"],
+    "esportes": ["academias", "fitness", "esporte coletivo", "esporte individual", "clubes"],
+    "entretenimento": ["eventos", "shows", "cinema", "música", "streaming"],
+    "e-commerce": ["lojas online", "marketplaces", "plataformas de venda", "comércio eletrônico"],
+    "pet": ["produtos para animais", "veterinários", "clínicas pet", "alimentos para pets"],
+    "eventos": ["cerimonial", "buffets", "organização de eventos", "festas", "congressos"],
+    "limpeza urbana": ["coleta de lixo", "varrição", "gestão de resíduos urbanos", "serviços públicos"],
+    "serviços gerais": ["terceirização", "multisserviços", "facilities", "mão de obra auxiliar"]
+}
+
+
+
+
 def normalizar_segmentos(segmentos: str):
     if isinstance(segmentos, list):
         segmentos = " ".join(segmentos)
@@ -107,6 +163,38 @@ def buscar_similares_embedding(termo, descricoes, threshold=0.65):
         logger.error(f"Erro em similaridade por embedding: {e}")
         return termo
 
+def normalizar_segmentos_inteligente(termo_usuario, descricoes_cnae, embeddings_cnae):
+    termo = termo_usuario.strip().lower()
+
+    # 1. Substituição via dicionário
+    for chave, lista in equivalencias_semanticas.items():
+        if termo in [chave] + lista:
+            return lista
+
+    # 2. Embedding semântico
+    try:
+        emb_termo = get_embedding(termo)
+        similaridades = [np.dot(emb_termo, e) for e in embeddings_cnae]
+        top_indices = np.argsort(similaridades)[::-1][:5]
+        top_descricoes = [descricoes_cnae[i] for i in top_indices if similaridades[i] > 0.70]
+        if top_descricoes:
+            return top_descricoes
+    except:
+        pass
+
+    # 3. Fuzzy Matching
+    fuzzy = get_close_matches(termo, descricoes_cnae, n=3, cutoff=0.7)
+    if fuzzy:
+        return fuzzy
+
+    # 4. Fallback OpenAI
+    try:
+        resposta = perguntar_para_openai(termo)
+        return [resposta]
+    except:
+        return [termo]
+
+
 def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str], faltantes: int):
     prompt = f"""
 Considere segmentos de atuação: {", ".join(segmentos)}.
@@ -130,12 +218,17 @@ Liste apenas os nomes das cidades, separados por vírgula em uma única linha.
         return []
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
-    segmentos_lista = normalizar_segmentos(segmentos)
-    logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
+    descricoes_cnae = raw_df["Descricao_CNAE"].dropna().unique().tolist()
+    embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
+    segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
 
     try:
         filtrados = pd.DataFrame()
         descricoes_cnae = raw_df["Descricao_CNAE"].dropna().unique().tolist()
+        embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
+        segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
+
+        logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
 
         for termo in segmentos_lista:
             termo_similar = buscar_similares_embedding(termo, descricoes_cnae)

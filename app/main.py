@@ -170,11 +170,19 @@ async def chat(req: Request):
                 prompt = gerar_prompt(data)
                 data["prompt"] = prompt
                 data["finalizado"] = True
-                logger.info("Diagnostico preparado com sucesso")
-                return {"mensagem": "Analisando as respostas e preparando o seu diagnostico...", "loading": True}
+                logger.info("Prompt preparado com sucesso")
+                return {
+                    "mensagem": "Analisando suas respostas e preparando o diagnóstico...",
+                    "loading": True,
+                    "email": data["email"]
+                }
             except Exception as e:
-                logger.error(f"Erro ao preparar diagnostico: {str(e)}")
-                return {"mensagem": "Ocorreu um erro ao preparar o diagnostico.", "resumo": f"Erro: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
+                logger.error(f"Erro ao preparar prompt: {str(e)}")
+            return {
+                "mensagem": "Erro ao processar suas respostas.",
+                "resumo": f"Erro técnico: {str(e)}",
+                "email": data["email"]
+            }
 
     return {"mensagem": "Diagnostico ja concluido."}
 
