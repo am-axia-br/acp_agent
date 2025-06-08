@@ -60,7 +60,9 @@ def novo_diagnostico():
         "prompt": None
     }
 
-data = novo_diagnostico()
+data = novo_diagnostico()  # ✅ isso sim está certo!
+
+
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
