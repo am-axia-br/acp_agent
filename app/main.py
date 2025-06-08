@@ -32,7 +32,6 @@ def novo_diagnostico():
 
 data = novo_diagnostico()
 
-
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
