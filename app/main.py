@@ -219,13 +219,11 @@ def truncar_texto(texto, limite=500):
     return texto[:limite] + "..." if len(texto) > limite else texto
 
 def gerar_prompt(data):
-
     origem = data.get("origem", "")
     nome = data["nome"]
     empresa = data["empresa"]
     respostas = data["diagnostico"]
 
-    # Variáveis nomeadas para facilitar a leitura e permitir uso em perguntas dinâmicas
     site = respostas[0]
     segmentos_raw = respostas[1]
     clientes = respostas[2]
@@ -259,77 +257,40 @@ def gerar_prompt(data):
         novos_clientes = 1
         ciclo = 90
 
-# Cálculo reverso baseado nas taxas
-
     oportunidades = int(novos_clientes / taxa_vendas)
     prospeccoes = int(oportunidades / taxa_pros)
 
+    conhecimento_modelos = buscar_conhecimento_complementado(
+        f"Quais modelos de parceria são ideais para empresas como a {empresa}, que atuam com {produtos} no segmento {segmento}?"
+    )
+    conhecimento_perfis = buscar_conhecimento_complementado(
+        f"Quais os perfis de empresas parceiras ideais para {empresa}, considerando que seus clientes são como: {clientes}?"
+    )
+    conhecimento_servicos = buscar_conhecimento_complementado(
+        f"Que serviços agregados são relevantes para empresas que vendem {produtos}, com modelo de negócio baseado em {modelo}?"
+    )
 
-    conhecimento_modelos = buscar_conhecimento_complementado(f"Quais modelos de parceria são ideais para empresas como a {empresa}, que atuam com {produtos} no segmento {segmento}?")
-    conhecimento_perfis = buscar_conhecimento_complementado(f"Quais os perfis de empresas parceiras ideais para {empresa}, considerando que seus clientes são como: {clientes}?")
-    conhecimento_servicos = buscar_conhecimento_complementado(f"Que serviços agregados são relevantes para empresas que vendem {produtos}, com modelo de negócio baseado em {modelo}?")
-
-
+    # 🔍 CIDADES – RAG + OpenAI até 30, sem fictícias
     segmentos_str = ", ".join(segmentos_normalizados)
     cidades_df = filtrar_municipios_por_segmento(segmentos_str, top_n=30)
 
-    for col in ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
+    for col in ["Municipio", "Estado", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
         if col not in cidades_df.columns:
             cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
 
-    if len(cidades_df) < 30:
-        cidades_existentes = cidades_df["Municipio"].tolist() if "Municipio" in cidades_df.columns else []
-        faltantes = 30 - len(cidades_existentes)
-
-        cidades_df_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
-        cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
-
-        cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
+    cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
 
     if len(cidades_df) < 30:
-        logger.warning(f"Apenas {len(cidades_df)} cidades foram obtidas. Preenchendo com cidades fictícias.")
-        for i in range(30 - len(cidades_df)):
-            cidades_df.loc[len(cidades_df)] = {
-                "Municipio": f"CidadeFicticia{i+1}",
-                "Estado": "XX",
-                "Populacao": 0,
-                "PIB": 0,
-                "Empresas_Segmento": 0,
-                "Empresas_Perfil_Canal": 0
-        }
-
+        cidades_existentes = cidades_df["Municipio"].tolist()
+        faltantes = 30 - len(cidades_df)
         cidades_df_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
-            
+
+        for col in ["Municipio", "Estado", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
+            if col not in cidades_df_extra.columns:
+                cidades_df_extra[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
+
         cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
-
-        if len(cidades_df) < 30:
-            logger.warning(f"Apenas {len(cidades_df)} cidades foram obtidas. Preenchendo com cidades fictícias.")
-            for i in range(30 - len(cidades_df)):
-                cidades_df.loc[len(cidades_df)] = {
-                    "Municipio": f"CidadeFicticia{i+1}",
-                    "Estado": "XX",
-                    "Populacao": 0,
-                    "PIB": 0,
-                    "Empresas_Segmento": 0,
-                    "Empresas_Perfil_Canal": 0
-        }
-
         cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
-
-        cidades_completas = cidades_existentes + cidades_extra[:faltantes]
-
-        if faltantes > 0 and cidades_extra:
-            cidades_df_extra = pd.DataFrame({
-                "Municipio": cidades_extra[:faltantes],
-                "Populacao": [0] * faltantes,
-                "PIB": [0] * faltantes,
-                "Empresas_Segmento": [0] * faltantes,
-                "Empresas_Perfil_Canal": [0] * faltantes,
-                "Salario_Medio_R$": [0] * faltantes
-            })
-            cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
-            cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
-
 
     cidades_html = gerar_tabela_html(cidades_df)
 
@@ -345,18 +306,17 @@ def gerar_prompt(data):
     oportunidades = int(novos_clientes / conversao)
     prospeccoes = int(oportunidades / conversao)
 
-    # Novo cálculo: Receita acumulada com canais ativando 1 por mês
     from datetime import datetime, timedelta
     receita_24_meses = 0
     hoje = datetime.today()
 
-    for canal_index in range(20):  # Máximo de 20 canais
+    for canal_index in range(20):
         dias_ate_primeira_venda = 90 + ciclo + (canal_index * 30)
         data_primeira_venda = hoje + timedelta(days=dias_ate_primeira_venda)
         meses_restantes = max(0, 24 - ((data_primeira_venda - hoje).days // 30))
         receita_24_meses += ticket * meses_restantes
 
-    receita_mensal = ticket * novos_clientes * 20  # Receita "cheia" hipotética
+    receita_mensal = ticket * novos_clientes * 20
 
     return f'''
 🧠 DIAGNÓSTICO ESTRUTURADO – EMPRESA {empresa.upper()}
@@ -364,22 +324,22 @@ def gerar_prompt(data):
 🔹 Local informado:
 {origem}
 
-🔹 Parte 01 – Resumo sobre a empresa:
+🔹 Resumo sobre a empresa:
 {resumo_empresa}
 
-🔹 Parte 02 – Produtos e Serviços:
+🔹 Produtos e Serviços:
 {resumo_produto}
 
-🔹 Parte 03 – Perfil dos Clientes atendidos:
+🔹 Perfil dos Clientes atendidos:
 {resumo_clientes}
 
-🔹 Parte 04 – Dores e Benefícios:
+🔹 Dores e Benefícios:
 {dores}
 
-🔹 Parte 05 – Modelo de Negócio:
+🔹 Modelo de Negócio:
 {modelo_negocio}
 
-🔹 Parte 06 – Necessidades de Prospecção:
+🔹 Necessidades de Prospecção:
 - Meta Prevista: {novos_clientes} novo cliente/mês  
 - Ciclo de Venda: {ciclo} dias  
 - Índice de Conversão de Prospecção em Oportunidade: {int(taxa_pros * 100)}%  
@@ -387,31 +347,30 @@ def gerar_prompt(data):
 - Índice de Conversão de Oportunidades em Vendas: {int(taxa_vendas * 100)}%  
 - Número de Oportunidades: {oportunidades:,}
 
-
-🔹 Parte 07 – Modelos de Parceria:
+🔹 Modelos de Parceria:
 {conhecimento_modelos}
 
-🔹 Parte 08 – Perfis de Empresas Parceiras com FIT:
+🔹 Perfis de Empresas Parceiras com FIT:
 {conhecimento_perfis}
 
-🔹 Parte 09 – Serviços Agregados:
+🔹 Serviços Agregados:
 {conhecimento_servicos}
 
-🔹 Parte 10 – Cidades com Potencial:
+🔹 Cidades com Potencial:
 {cidades_html}
 
-🔹 Parte 11 – Retorno sobre o Investimento:
+🔹 Retorno sobre o Investimento:
 Ticket Médio: R${ticket:,.2f}
 Receita Mensal com 20 canais: R${receita_mensal:,.2f}
 Receita estimada em 24 meses: R${receita_24_meses:,.2f}
 
-🔹 Parte 12 – Dicas Estratégicas:
+🔹 Dicas Estratégicas:
 - Inicie com 3 a 5 canais
 - Forneça treinamentos e acompanhamento semanal
 - Crie campanhas e ações de marketing
 - Corrija falhas com feedback dos canais
 
-🔹 Parte 13 – Chamada para Ação:
+🔹 Chamada para Ação:
 Sua empresa está pronta para crescer com uma estratégia sólida de canais de vendas.
 Entre em contato com a AC Partners e comece agora o onboarding comercial com especialistas.
 '''
@@ -443,7 +402,7 @@ def sugerir_cidades_openai(segmentos, total_necessario=30):
                 {"role": "user", "content": prompt}
             ],
             temperature=0.4,
-            max_tokens=800
+            max_tokens=2000
         )
         cidades = resposta.choices[0].message.content.strip().split("\n")
         return [c.strip().split("-")[0].strip() for c in cidades if c.strip()]
