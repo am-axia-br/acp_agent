@@ -11,6 +11,7 @@ import hashlib
 from difflib import get_close_matches
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+COLUNA_ATIVIDADE = "Seções e divisões da classificação de atividades"
 
 # Cache para embeddings
 embedding_cache_path = "embedding_cache.json"
@@ -229,13 +230,13 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PI
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
 
-    descricoes_cnae = raw_df["Descricao_CNAE"].dropna().unique().tolist()
+    descricoes_cnae = raw_df[COLUNA_ATIVIDADE].dropna().unique().tolist()
     embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
     segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
 
     try:
         filtrados = pd.DataFrame()
-        descricoes_cnae = raw_df["Descricao_CNAE"].dropna().unique().tolist()
+        descricoes_cnae = raw_df[COLUNA_ATIVIDADE].dropna().unique().tolist()
         embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
         segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
 
@@ -243,7 +244,7 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
 
         for termo in segmentos_lista:
 
-            encontrados = raw_df[raw_df["Descricao_CNAE"].astype(str).str.lower().str.contains(termo.lower(), na=False)]
+            encontrados = raw_df[raw_df[COLUNA_ATIVIDADE].astype(str).str.lower().str.contains(termo.lower(), na=False)]
  
             if not encontrados.empty:
                 filtrados = pd.concat([filtrados, encontrados])

@@ -177,12 +177,10 @@ async def chat(req: Request):
                     "email": data["email"]
                 }
             except Exception as e:
-                logger.error(f"Erro ao preparar prompt: {str(e)}")
-            return {
-                "mensagem": "Erro ao processar suas respostas.",
-                "resumo": f"Erro técnico: {str(e)}",
-                "email": data["email"]
-            }
+                print(f"Erro ao preparar prompt: {e}")
+                return {
+                    "resumo": f"Erro técnico: {str(e)}"
+                }
 
     return {"mensagem": "Diagnostico ja concluido."}
 
