@@ -296,9 +296,9 @@ def gerar_prompt(data):
                 "Empresas_Perfil_Canal": 0
         }
 
-        cidades_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
-
-        cidades_df = pd.concat([cidades_df, cidades_extra], ignore_index=True)
+        cidades_df_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
+            
+        cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
 
         if len(cidades_df) < 30:
             logger.warning(f"Apenas {len(cidades_df)} cidades foram obtidas. Preenchendo com cidades fictícias.")
