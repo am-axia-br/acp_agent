@@ -46,9 +46,6 @@ def cosine_similarity(v1, v2):
 sheets_dict = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
 sheet_names = list(sheets_dict.keys())
 
-raw_df.rename(columns={
-    "Seções e divisões da classificação de atividades": "Descricao_CNAE"
-}, inplace=True)
 
 raw_df.columns = [
     "Municipio", "Codigo_CNAE", "Seções e divisões da classificação de atividades",
