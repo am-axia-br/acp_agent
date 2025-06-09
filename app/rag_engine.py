@@ -112,9 +112,6 @@ equivalencias_semanticas = {
     "serviços gerais": ["terceirização", "multisserviços", "facilities", "mão de obra auxiliar"]
 }
 
-
-
-
 def normalizar_segmentos(segmentos: str):
     if isinstance(segmentos, list):
         segmentos = " ".join(segmentos)
@@ -259,15 +256,25 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
             sugestoes_openai = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltam)
 
             if sugestoes_openai:
-                extras = pd.DataFrame({
-                    "Municipio": sugestoes_openai,
-                    "Populacao": np.random.randint(1000, 20000000, size=len(sugestoes_openai)),
-                    "PIB": np.round(np.random.uniform(0.3, 10.0, size=len(sugestoes_openai)), 2),
-                    "Empresas_Segmento": np.random.randint(20, 100, size=len(sugestoes_openai)),
-                    "Empresas_Perfil_Canal": np.random.randint(5, 50, size=len(sugestoes_openai)),
-                    "Salario_Medio_R$": np.round(np.random.uniform(1800, 3500, size=len(sugestoes_openai)), 2)
-                })
+                extras = sugestoes_openai[["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]].copy()
+
                 final_df = pd.concat([final_df, extras], ignore_index=True)
+
+                final_df = final_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
+
+                # Garante que haja 30 cidades
+
+                if len(final_df) < top_n:
+                    logger.warning(f"Apenas {len(final_df)} cidades foram obtidas. Preenchendo com cidades fictícias.")
+                    for i in range(top_n - len(final_df)):
+                        final_df.loc[len(final_df)] = {
+                            "Municipio": f"CidadeFicticia{i+1}",
+                            "Populacao": 0,
+                            "PIB": 0,
+                            "Empresas_Segmento": 0,
+                            "Empresas_Perfil_Canal": 0,
+                            "Salario_Medio_R$": 0
+                        }
 
         return final_df.head(top_n)
 

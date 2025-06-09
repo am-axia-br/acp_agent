@@ -280,8 +280,10 @@ def gerar_prompt(data):
     if len(cidades_df) < 30:
         cidades_existentes = cidades_df["Municipio"].tolist() if "Municipio" in cidades_df.columns else []
         faltantes = 30 - len(cidades_existentes)
-        cidades_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
+
+        cidades_df_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
         cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
+
         cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
 
     if len(cidades_df) < 30:
