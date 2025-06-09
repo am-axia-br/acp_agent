@@ -47,20 +47,6 @@ sheets_dict = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
 sheet_names = list(sheets_dict.keys())
 
 
-raw_df.columns = [
-    "Municipio", "Codigo_CNAE", "Seções e divisões da classificação de atividades",
-    "Unidades_Locais", "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
-    "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
-]
-
-
-raw_df = raw_df[raw_df["Municipio"].notna()]
-raw_df = raw_df[~raw_df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
-raw_df = raw_df[~raw_df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
-raw_df = raw_df[raw_df["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
-raw_df["Unidades_Locais"] = pd.to_numeric(raw_df["Unidades_Locais"], errors="coerce")
-raw_df["Salario_Medio_R$"] = pd.to_numeric(raw_df["Salario_Medio_R$"], errors="coerce")
-
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
 equivalencias_semanticas = {
@@ -239,9 +225,24 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PI
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
 
-    descricoes_cnae = raw_df[COLUNA_ATIVIDADE].dropna().unique().tolist()
+    # Coletar descrições únicas de todas as abas
+    descricoes_cnae = set()
+
+    for nome_aba in sheet_names:
+        df_sheet = sheets_dict[nome_aba]
+        if COLUNA_ATIVIDADE in df_sheet.columns:
+            descricoes = df_sheet[COLUNA_ATIVIDADE].dropna().unique().tolist()
+            descricoes_cnae.update(descricoes)
+
+    descricoes_cnae = list(descricoes_cnae)
+
+    # Gerar embeddings para os CNAEs coletados
+    
     embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
+
+    # Normalizar segmentos com base nas descrições extraídas
     segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
+
 
     try:
         filtrados = pd.DataFrame()
