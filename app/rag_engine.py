@@ -49,10 +49,11 @@ raw_df.rename(columns={
 }, inplace=True)
 
 raw_df.columns = [
-    "Municipio", "Codigo_CNAE","Seções e divisões da classificação de atividades",
-    "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
+    "Municipio", "Codigo_CNAE", "Seções e divisões da classificação de atividades",
+    "Unidades_Locais", "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
     "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
 ]
+
 
 raw_df = raw_df[raw_df["Municipio"].notna()]
 raw_df = raw_df[~raw_df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
