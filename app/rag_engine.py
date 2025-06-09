@@ -116,6 +116,15 @@ def simular_populacao_pib(df_segmento):
     media_salarial_base = df_segmento.groupby("Municipio")["Salario_Medio_R$"].mean().values
     salarios = np.clip(np.round(media_salarial_base * np.random.uniform(0.85, 1.25), 2), 1500.0, 15000.0)
 
+    return pd.DataFrame({
+        "Municipio": municipios,
+        "Populacao": populacoes,
+        "PIB": pibs,
+        "Empresas_Segmento": empresas,
+        "Empresas_Perfil_Canal": perfil_canal,
+        "Salario_Medio_R$": salarios
+    })
+
 def processar_aba_por_segmento(df_sheet, segmentos_lista):
     resultados = pd.DataFrame()
     for termo in segmentos_lista:
@@ -126,15 +135,6 @@ def processar_aba_por_segmento(df_sheet, segmentos_lista):
             logger.warning(f"Segmento '{termo}' não encontrado na aba.")
     return resultados
 
-
-    return pd.DataFrame({
-        "Municipio": municipios,
-        "Populacao": populacoes,
-        "PIB": pibs,
-        "Empresas_Segmento": empresas,
-        "Empresas_Perfil_Canal": perfil_canal,
-        "Salario_Medio_R$": salarios
-    })
 
 def buscar_similares_embedding(termo, descricoes, threshold=0.35):
     try:
@@ -226,6 +226,7 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PI
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
 
     # Coletar descrições únicas de todas as abas
+
     descricoes_cnae = set()
 
     for nome_aba in sheet_names:
@@ -241,14 +242,12 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
     embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
 
     # Normalizar segmentos com base nas descrições extraídas
+
     segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
 
 
     try:
         filtrados = pd.DataFrame()
-        descricoes_cnae = raw_df[COLUNA_ATIVIDADE].dropna().unique().tolist()
-        embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
-        segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
 
         logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
 
@@ -276,8 +275,8 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
 
             resultado_aba = processar_aba_por_segmento(df_sheet, segmentos_lista)
 
-        if not resultado_aba.empty:
-            filtrados = pd.concat([filtrados, resultado_aba])
+            if not resultado_aba.empty:
+                filtrados = pd.concat([filtrados, resultado_aba])
 
         if filtrados.empty:
             return pd.DataFrame(columns=["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"])
