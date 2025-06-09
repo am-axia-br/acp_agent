@@ -264,15 +264,20 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
             logger.warning(f"Apenas {len(final_df)} cidades encontradas no RAG. Buscando {faltam} na OpenAI.")
             sugestoes_openai = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltam)
 
+
+
             if not sugestoes_openai.empty:
-                logger.info(f"{len(sugestoes_openai)} cidades sugeridas pela OpenAI.")
-                extras = sugestoes_openai[["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal"]].copy()
-                extras["Salario_Medio_R$"] = 0.0  # Adiciona coluna se estiver faltando
+                colunas_necessarias = ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal"]
+                for coluna in colunas_necessarias:
+                    if coluna not in sugestoes_openai.columns:
+                        sugestoes_openai[coluna] = 0
+
+                if "Salario_Medio_R$" not in sugestoes_openai.columns:
+                    sugestoes_openai["Salario_Medio_R$"] = 5500.0  # valor médio estimado
+
+                extras = sugestoes_openai[colunas_necessarias + ["Salario_Medio_R$"]].copy()
 
                 final_df = pd.concat([final_df, extras], ignore_index=True)
-                final_df = final_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
-            else:
-                logger.warning("OpenAI não retornou cidades. Nenhuma cidade foi adicionada.")
 
 
                 # Garante que haja 30 cidades
