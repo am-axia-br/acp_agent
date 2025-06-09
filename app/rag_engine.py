@@ -44,8 +44,12 @@ def cosine_similarity(v1, v2):
 all_sheets = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
 raw_df = pd.concat(all_sheets.values(), ignore_index=True)
 
+raw_df.rename(columns={
+    "Seções e divisões da classificação de atividades": "Descricao_CNAE"
+}, inplace=True)
+
 raw_df.columns = [
-    "Municipio", "Codigo_CNAE", "Descricao_CNAE", "Unidades_Locais",
+    "Municipio", "Codigo_CNAE","Seções e divisões da classificação de atividades",
     "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
     "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
 ]
