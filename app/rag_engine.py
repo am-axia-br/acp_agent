@@ -135,7 +135,7 @@ def simular_populacao_pib(df_segmento):
         "Salario_Medio_R$": salarios
     })
 
-def buscar_similares_embedding(termo, descricoes, threshold=0.65):
+def buscar_similares_embedding(termo, descricoes, threshold=0.35):
     try:
         termo_emb = get_embedding(termo)
         if termo_emb is None:
@@ -183,7 +183,7 @@ def normalizar_segmentos_inteligente(termo_usuario, descricoes_cnae, embeddings_
         pass
 
     # 3. Fuzzy Matching
-    fuzzy = get_close_matches(termo, descricoes_cnae, n=3, cutoff=0.7)
+    fuzzy = get_close_matches(termo, descricoes_cnae, n=3, cutoff=0.30)
     if fuzzy:
         return fuzzy
 
@@ -223,6 +223,7 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PI
 
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
+
     descricoes_cnae = raw_df["Descricao_CNAE"].dropna().unique().tolist()
     embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
     segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
@@ -236,8 +237,9 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
         logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
 
         for termo in segmentos_lista:
-            termo_similar = buscar_similares_embedding(termo, descricoes_cnae)
-            encontrados = raw_df[raw_df["Descricao_CNAE"].astype(str).str.contains(termo_similar, case=False, na=False)]
+
+            encontrados = raw_df[raw_df["Descricao_CNAE"].astype(str).str.lower().str.contains(termo.lower(), na=False)]
+ 
             if not encontrados.empty:
                 filtrados = pd.concat([filtrados, encontrados])
             else:
