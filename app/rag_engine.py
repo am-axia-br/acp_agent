@@ -42,8 +42,9 @@ def cosine_similarity(v1, v2):
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
 # Lê todas as abas do arquivo Excel
-all_sheets = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
-raw_df = pd.concat(all_sheets.values(), ignore_index=True)
+
+sheets_dict = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
+sheet_names = list(sheets_dict.keys())
 
 raw_df.rename(columns={
     "Seções e divisões da classificação de atividades": "Descricao_CNAE"
@@ -131,6 +132,17 @@ def simular_populacao_pib(df_segmento):
     perfil_canal = np.round(empresas * np.random.uniform(0.1, 0.5)).astype(int)
     media_salarial_base = df_segmento.groupby("Municipio")["Salario_Medio_R$"].mean().values
     salarios = np.clip(np.round(media_salarial_base * np.random.uniform(0.85, 1.25), 2), 1500.0, 15000.0)
+
+def processar_aba_por_segmento(df_sheet, segmentos_lista):
+    resultados = pd.DataFrame()
+    for termo in segmentos_lista:
+        encontrados = df_sheet[df_sheet[COLUNA_ATIVIDADE].astype(str).str.lower().str.contains(termo.lower(), na=False)]
+        if not encontrados.empty:
+            resultados = pd.concat([resultados, encontrados])
+        else:
+            logger.warning(f"Segmento '{termo}' não encontrado na aba.")
+    return resultados
+
 
     return pd.DataFrame({
         "Municipio": municipios,
@@ -242,14 +254,32 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
 
         logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
 
-        for termo in segmentos_lista:
 
-            encontrados = raw_df[raw_df[COLUNA_ATIVIDADE].astype(str).str.lower().str.contains(termo.lower(), na=False)]
- 
-            if not encontrados.empty:
-                filtrados = pd.concat([filtrados, encontrados])
-            else:
-                logger.warning(f"Segmento '{termo}' nao encontrado no RAG.")
+        filtrados = pd.DataFrame()
+
+        for nome_aba in sheet_names:
+            df_sheet = sheets_dict[nome_aba]
+
+            df_sheet.rename(columns={
+            "Seções e divisões da classificação de atividades": COLUNA_ATIVIDADE}, inplace=True)
+
+            df_sheet.columns = [
+                "Municipio", "Codigo_CNAE", COLUNA_ATIVIDADE,
+                "Unidades_Locais", "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
+                "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
+            ]
+
+            df_sheet = df_sheet[df_sheet["Municipio"].notna()]
+            df_sheet = df_sheet[~df_sheet["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
+            df_sheet = df_sheet[~df_sheet["Unidades_Locais"].astype(str).isin(["-", "nan"])]
+            df_sheet = df_sheet[df_sheet["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
+            df_sheet["Unidades_Locais"] = pd.to_numeric(df_sheet["Unidades_Locais"], errors="coerce")
+            df_sheet["Salario_Medio_R$"] = pd.to_numeric(df_sheet["Salario_Medio_R$"], errors="coerce")
+
+            resultado_aba = processar_aba_por_segmento(df_sheet, segmentos_lista)
+
+        if not resultado_aba.empty:
+            filtrados = pd.concat([filtrados, resultado_aba])
 
         if filtrados.empty:
             return pd.DataFrame(columns=["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"])
@@ -263,8 +293,6 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
             faltam = top_n - len(final_df)
             logger.warning(f"Apenas {len(final_df)} cidades encontradas no RAG. Buscando {faltam} na OpenAI.")
             sugestoes_openai = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltam)
-
-
 
             if not sugestoes_openai.empty:
                 colunas_necessarias = ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal"]
