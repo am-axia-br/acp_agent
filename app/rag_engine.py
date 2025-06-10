@@ -366,3 +366,19 @@ def gerar_tabela_html(dataframe: pd.DataFrame) -> str:
         </table>
     </div>
     """
+
+# Exportáveis globais
+try:
+    descricoes_cnae = set()
+    for nome_aba in sheet_names:
+        df_sheet = sheets_dict[nome_aba]
+        if COLUNA_ATIVIDADE in df_sheet.columns:
+            descricoes = df_sheet[COLUNA_ATIVIDADE].dropna().unique().tolist()
+            descricoes_cnae.update(descricoes)
+    descricoes_cnae = list(descricoes_cnae)
+    embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
+except Exception as e:
+    descricoes_cnae = []
+    embeddings_cnae = []
+    logger.warning(f"Erro ao preparar descrições e embeddings globais: {e}")
+
