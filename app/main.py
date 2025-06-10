@@ -16,7 +16,15 @@ from openai import OpenAI
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
-from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html
+from rag_engine import (
+    filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento,
+    gerar_tabela_html,
+    normalizar_segmentos_inteligente,
+    descricoes_cnae,
+    embeddings_cnae,
+    buscar_cidades_na_openai
+)
+
 
 from rag_parcerias import buscar_conhecimento
 
