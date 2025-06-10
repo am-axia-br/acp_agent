@@ -13,7 +13,9 @@ import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
-from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html, normalizar_segmentos
+
+from rag_engine import filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento, gerar_tabela_html
+
 from rag_parcerias import buscar_conhecimento
 
 def consultar_taxa_conversao_openai(segmentos):
@@ -234,7 +236,6 @@ def gerar_prompt(data):
     meta_clientes = respostas[9]
 
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
-    segmentos_normalizados = normalizar_segmentos(segmento_original)
 
     segmento = truncar_texto(segmentos_raw)
     clientes = truncar_texto(clientes)
@@ -269,8 +270,11 @@ def gerar_prompt(data):
     )
 
     # 🔍 CIDADES – RAG + OpenAI até 30, sem fictícias
+
     segmentos_str = ", ".join(segmentos_normalizados)
-    cidades_df = filtrar_municipios_por_segmento(segmentos_str, top_n=30)
+
+    cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
+
 
     for col in ["Municipio", "Estado", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
         if col not in cidades_df.columns:
