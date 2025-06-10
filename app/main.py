@@ -237,6 +237,8 @@ def gerar_prompt(data):
 
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
 
+    segmentos_normalizados = [s.strip().lower() for s in re.split(r"[,\s]+", segmentos_raw) if s.lower() not in STOPWORDS and len(s.strip()) > 2]
+
     segmento = truncar_texto(segmentos_raw)
     clientes = truncar_texto(clientes)
     dores = truncar_texto(dores)
