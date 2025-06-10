@@ -11,6 +11,7 @@ import hashlib
 from difflib import get_close_matches
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 COLUNA_ATIVIDADE = "Seções e divisões da classificação de atividades"
 
 # Cache para embeddings
@@ -126,13 +127,26 @@ def simular_populacao_pib(df_segmento):
     })
 
 def processar_aba_por_segmento(df_sheet, segmentos_lista):
+
     resultados = pd.DataFrame()
+
+
     for termo in segmentos_lista:
-        encontrados = df_sheet[df_sheet[COLUNA_ATIVIDADE].astype(str).str.lower().str.contains(termo.lower(), na=False)]
+        matches = df_sheet[COLUNA_ATIVIDADE].dropna().unique().tolist()
+        melhores_descricoes = get_close_matches(termo, matches, n=3, cutoff=0.3)
+
+        encontrados = pd.DataFrame()
+        for desc in melhores_descricoes:
+            encontrados = pd.concat([encontrados,
+                df_sheet[df_sheet[COLUNA_ATIVIDADE].astype(str).str.lower().str.contains(desc.lower(), na=False)]
+            ])
+
         if not encontrados.empty:
             resultados = pd.concat([resultados, encontrados])
         else:
-            logger.warning(f"Segmento '{termo}' não encontrado na aba.")
+            logger.warning(f"Segmento '{termo}' não encontrado na aba (nem por aproximação).")
+
+
     return resultados
 
 
