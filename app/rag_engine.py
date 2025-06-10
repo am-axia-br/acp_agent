@@ -103,111 +103,179 @@ equivalencias_semanticas = {
     "serviços gerais": ["terceirização", "multisserviços", "facilities", "mão de obra auxiliar"]
 }
 
-def normalizar_segmentos(segmentos: str):
-    if isinstance(segmentos, list):
-        segmentos = " ".join(segmentos)
-    return [s.strip() for s in segmentos.replace(",", " ").split() if len(s.strip()) > 2 and s.strip().lower() not in STOPWORDS]
 
-def simular_populacao_pib(df_segmento):
-    municipios = df_segmento["Municipio"].unique()
-    empresas = df_segmento.groupby("Municipio")["Unidades_Locais"].sum().values
-    populacoes = np.clip(np.round(empresas * np.random.uniform(15, 60)).astype(int), 1000, 20_000_000)
-    pibs = np.clip(np.round(empresas * np.random.uniform(0.02, 0.08), 2), 0.3, 200.0)
-    perfil_canal = np.round(empresas * np.random.uniform(0.1, 0.5)).astype(int)
-    media_salarial_base = df_segmento.groupby("Municipio")["Salario_Medio_R$"].mean().values
-    salarios = np.clip(np.round(media_salarial_base * np.random.uniform(0.85, 1.25), 2), 1500.0, 15000.0)
-
-    return pd.DataFrame({
-        "Municipio": municipios,
-        "Populacao": populacoes,
-        "PIB": pibs,
-        "Empresas_Segmento": empresas,
-        "Empresas_Perfil_Canal": perfil_canal,
-        "Salario_Medio_R$": salarios
-    })
-
-def processar_aba_por_segmento(df_sheet, segmentos_lista):
-
-    resultados = pd.DataFrame()
+equivalencias_semanticas_canais = {
+    
+    # Segmentos de canais desejados
+    "tecnologia": ["ti", "software", "hardware", "sistemas", "desenvolvimento de software", "startups"],
+    "gestão": ["administração", "gerenciamento", "gestão empresarial", "consultoria em gestão"],
+    "informática": ["tecnologia da informação", "infraestrutura de ti", "serviços de informática", "manutenção de computadores"],
+    "internet": ["web", "rede", "provedor de internet", "plataformas digitais", "aplicações online", "serviços online"],
+    "consultoria": ["assessoria", "consultoria empresarial", "consultoria estratégica", "serviços especializados"]
+}
 
 
-    for termo in segmentos_lista:
-        matches = df_sheet[COLUNA_ATIVIDADE].dropna().unique().tolist()
-        melhores_descricoes = get_close_matches(termo, matches, n=3, cutoff=0.3)
-
-        encontrados = pd.DataFrame()
-        for desc in melhores_descricoes:
-            encontrados = pd.concat([encontrados,
-                df_sheet[df_sheet[COLUNA_ATIVIDADE].astype(str).str.lower().str.contains(desc.lower(), na=False)]
-            ])
-
-        if not encontrados.empty:
-            resultados = pd.concat([resultados, encontrados])
-        else:
-            logger.warning(f"Segmento '{termo}' não encontrado na aba (nem por aproximação).")
+def expandir_termos_por_equivalencia(lista_termos: list[str], base: dict) -> set:
+    termos_expandidos = set()
+    for termo in lista_termos:
+        termo = termo.lower()
+        similares = base.get(termo, [])
+        termos_expandidos.update([termo] + similares)
+    return termos_expandidos
 
 
-    return resultados
+def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n: int = 30):
+
+    #   Extrai informações das cidades com base nos segmentos informados pelo cliente (Empresa) 
+    #   e nos segmentos fixos definidos para canais de vendas.
+
+    #etorna:
+    #   DataFrame com as colunas:
+    #   - Municipio
+    #   - Empresas_Segmento (segmentos da empresa)
+    #   - Empresas_Perfil_Canal (segmentos fixos de canais)
 
 
-def buscar_similares_embedding(termo, descricoes, threshold=0.35):
-    try:
-        termo_emb = get_embedding(termo)
-        if termo_emb is None:
-            return termo
+    termos_cliente = expandir_termos_por_equivalencia(segmentos_cliente, equivalencias_semanticas)
+    termos_canais = expandir_termos_por_equivalencia(list(equivalencias_semanticas_canais.keys()), equivalencias_semanticas_canais)
 
-        scores = [
-            (descricao, cosine_similarity(termo_emb, get_embedding(descricao)))
-            for descricao in descricoes
+    resultados = {}
+
+    for nome_aba in sheet_names:
+        df = sheets_dict[nome_aba].copy()
+
+        if COLUNA_ATIVIDADE not in df.columns:
+            continue
+
+        df.rename(columns={"Seções e divisões da classificação de atividades": COLUNA_ATIVIDADE}, inplace=True)
+
+        df.columns = [
+            "Municipio", "Codigo_CNAE", COLUNA_ATIVIDADE,
+            "Unidades_Locais", "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
+            "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
         ]
 
-        melhor_match = sorted(scores, key=lambda x: x[1], reverse=True)[0]
-        if melhor_match[1] >= threshold:
-            return melhor_match[0]
+        df = df[df["Municipio"].notna()]
+        df = df[~df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
+        df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
+        df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
+        df = df[df["Unidades_Locais"].notna()]
 
-        logger.warning(f"Baixa similaridade para termo '{termo}': similaridade {melhor_match[1]:.4f}")
-        alternativas = get_close_matches(termo, descricoes, n=1, cutoff=0.6)
-        if alternativas:
-            return alternativas[0]
+        df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
 
-        return termo
+        for _, row in df.iterrows():
+            cidade = row["Municipio"]
+            atividade = row[COLUNA_ATIVIDADE]
+            unidades = row["Unidades_Locais"]
+
+            if cidade not in resultados:
+                resultados[cidade] = {"Empresas_Segmento": 0, "Empresas_Perfil_Canal": 0}
+
+            if any(termo in atividade for termo in termos_cliente):
+                resultados[cidade]["Empresas_Segmento"] += unidades
+
+            if any(termo in atividade for termo in termos_canais):
+                resultados[cidade]["Empresas_Perfil_Canal"] += unidades
+
+    df_final = pd.DataFrame([
+        {"Municipio": k, "Empresas_Segmento": v["Empresas_Segmento"], "Empresas_Perfil_Canal": v["Empresas_Perfil_Canal"]}
+        for k, v in resultados.items()
+    ])
+
+    return df_final.sort_values(by="Empresas_Segmento", ascending=False).head(top_n).reset_index(drop=True)
+
+
+def buscar_similares_embedding(termo: str, descricoes: list[str], threshold: float = 0.35, top_n: int = 3) -> list[str]:
+    """
+    Retorna as descrições mais semelhantes ao termo fornecido com base em embeddings,
+    fuzzy matching e fallback para match parcial por string.
+    """
+    try:
+        termo_emb = get_embedding(termo)
+        if not termo_emb:
+            logger.warning(f"Embedding nulo para termo: {termo}")
+            return []
+
+        # Calcula similaridade com todas as descrições
+        pontuacoes = []
+        for descricao in descricoes:
+            desc_emb = get_embedding(descricao)
+            if desc_emb:
+                score = cosine_similarity(termo_emb, desc_emb)
+                pontuacoes.append((descricao, score))
+
+        # Filtra por threshold
+        filtradas = [desc for desc, score in pontuacoes if score >= threshold]
+        if filtradas:
+            return sorted(filtradas, key=lambda x: -dict(pontuacoes)[x])[:top_n]
+
+        # Fallback: fuzzy matching
+        fuzzy = get_close_matches(termo, descricoes, n=top_n, cutoff=0.5)
+        if fuzzy:
+            logger.info(f"Fuzzy matching usado para termo '{termo}'")
+            return fuzzy
+
+        # Último recurso: match parcial
+        parciais = [desc for desc in descricoes if termo.lower() in desc.lower()]
+        if parciais:
+            return parciais[:top_n]
+
+        return []
+
     except Exception as e:
-        logger.error(f"Erro em similaridade por embedding: {e}")
-        return termo
+        logger.error(f"Erro em buscar_similares_embedding: {e}")
+        return []
 
-def normalizar_segmentos_inteligente(termo_usuario, descricoes_cnae, embeddings_cnae):
+
+def normalizar_segmentos_inteligente(termo_usuario: str, descricoes_cnae: list[str], embeddings_cnae: list[list[float]], usar_openai_fallback: bool = False) -> list[str]:
+    """
+    Normaliza um termo informado com base nas descrições CNAE e retorna os termos mais semelhantes.
+    Usa: equivalência semântica → embedding → fuzzy → fallback
+    """
     termo = termo_usuario.strip().lower()
 
-    # 1. Substituição via dicionário
+    # 1. Verifica se existe correspondência direta no dicionário de equivalências
     for chave, lista in equivalencias_semanticas.items():
-        if termo in [chave] + lista:
-            return lista
+        if termo == chave or termo in lista:
+            return list(set([chave] + lista))
 
-    # 2. Embedding semântico
+    # 2. Similaridade por embedding
     try:
         emb_termo = get_embedding(termo)
-        similaridades = [np.dot(emb_termo, e) for e in embeddings_cnae]
-        top_indices = np.argsort(similaridades)[::-1][:5]
-        top_descricoes = [descricoes_cnae[i] for i in top_indices if similaridades[i] > 0.30]
-        if not top_descricoes:
-            top_descricoes = [descricoes_cnae[top_indices[0]]]
+        if not emb_termo:
+            logger.warning(f"Embedding não encontrado para termo: {termo}")
+        else:
+            similaridades = [cosine_similarity(emb_termo, emb) for emb in embeddings_cnae]
+            top_indices = np.argsort(similaridades)[::-1]
+            top_descricoes = [descricoes_cnae[i] for i in top_indices if similaridades[i] > 0.35][:5]
+            if top_descricoes:
+                return top_descricoes
+    except Exception as e:
+        logger.warning(f"Erro em embedding do termo '{termo}': {e}")
 
-        if top_descricoes:
-            return top_descricoes
-    except:
-        pass
-
-    # 3. Fuzzy Matching
-    fuzzy = get_close_matches(termo, descricoes_cnae, n=3, cutoff=0.30)
+    # 3. Fuzzy matching
+    fuzzy = get_close_matches(termo, descricoes_cnae, n=5, cutoff=0.4)
     if fuzzy:
         return fuzzy
 
-    # 4. Fallback OpenAI
-    try:
-        resposta = perguntar_para_openai(termo)
-        return [resposta]
-    except:
-        return [termo]
+    # 4. Fallback com OpenAI (opcional)
+    if usar_openai_fallback:
+        try:
+            prompt = f"""Você é um classificador inteligente. A seguir, está um termo de atividade empresarial: '{termo_usuario}'.
+Retorne uma descrição de atividade CNAE brasileira mais próxima possível.
+"""
+            resposta = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.4
+            )
+            texto = resposta.choices[0].message.content.strip()
+            return [texto]
+        except Exception as e:
+            logger.error(f"Erro no fallback OpenAI para termo '{termo}': {e}")
+
+    # 5. Fallback final
+    return [termo_usuario]
 
 
 def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str], faltantes: int):
@@ -237,141 +305,59 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PI
         return pd.DataFrame()
 
 
-def filtrar_municipios_por_segmentos_multiplos(segmentos: str, top_n: int = 30):
+def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: int = 30) -> pd.DataFrame:
+    """
+    Função intermediária que transforma texto solto em lista de segmentos e
+    executa a busca por municípios com base no novo motor inteligente.
+    """
+    # Converte entrada textual em lista de termos (ex: "agro, logística")
+    segmentos_lista = [
+        seg.strip().lower()
+        for seg in segmentos_textuais.replace(",", " ").split()
+        if seg.strip().lower() not in STOPWORDS and len(seg.strip()) > 2
+    ]
 
-    # Coletar descrições únicas de todas as abas
+    if not segmentos_lista:
+        logger.warning("Nenhum segmento válido informado.")
+        return pd.DataFrame(columns=["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"])
 
-    descricoes_cnae = set()
+    # Aponta diretamente para o motor novo e unificado
+    df_resultado = extrair_dados_segmentos_cliente_e_canais(segmentos_lista, top_n=top_n)
 
-    for nome_aba in sheet_names:
-        df_sheet = sheets_dict[nome_aba]
-        if COLUNA_ATIVIDADE in df_sheet.columns:
-            descricoes = df_sheet[COLUNA_ATIVIDADE].dropna().unique().tolist()
-            descricoes_cnae.update(descricoes)
+    if df_resultado.empty:
+        logger.warning("Nenhum município encontrado para os segmentos informados.")
 
-    descricoes_cnae = list(descricoes_cnae)
-
-    # Gerar embeddings para os CNAEs coletados
-    
-    embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
-
-    # Normalizar segmentos com base nas descrições extraídas
-
-    segmentos_lista = normalizar_segmentos_inteligente(segmentos, descricoes_cnae, embeddings_cnae)
-
-
-    try:
-        filtrados = pd.DataFrame()
-
-        logger.info(f"Segmentos identificados para busca: {segmentos_lista}")
+    return df_resultado
 
 
-        filtrados = pd.DataFrame()
-
-        for nome_aba in sheet_names:
-            df_sheet = sheets_dict[nome_aba]
-
-            df_sheet.rename(columns={
-            "Seções e divisões da classificação de atividades": COLUNA_ATIVIDADE}, inplace=True)
-
-            df_sheet.columns = [
-                "Municipio", "Codigo_CNAE", COLUNA_ATIVIDADE,
-                "Unidades_Locais", "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
-                "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
-            ]
-
-            df_sheet = df_sheet[df_sheet["Municipio"].notna()]
-            df_sheet = df_sheet[~df_sheet["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
-            df_sheet = df_sheet[~df_sheet["Unidades_Locais"].astype(str).isin(["-", "nan"])]
-            df_sheet = df_sheet[df_sheet["Salario_Medio_R$"].astype(str).str.replace(",", "").str.replace(".", "").str.isnumeric()]
-            df_sheet["Unidades_Locais"] = pd.to_numeric(df_sheet["Unidades_Locais"], errors="coerce")
-            df_sheet["Salario_Medio_R$"] = pd.to_numeric(df_sheet["Salario_Medio_R$"], errors="coerce")
-
-            resultado_aba = processar_aba_por_segmento(df_sheet, segmentos_lista)
-
-            if not resultado_aba.empty:
-                filtrados = pd.concat([filtrados, resultado_aba])
-
-        if filtrados.empty:
-            return pd.DataFrame(columns=["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"])
-
-        dados_complementares = simular_populacao_pib(filtrados)
-        final_df = dados_complementares.groupby("Municipio").sum(numeric_only=True).reset_index()
-        final_df = final_df.sort_values(by="Empresas_Segmento", ascending=False).head(top_n)
-
-        if len(final_df) < top_n:
-            cidades_existentes = final_df["Municipio"].tolist()
-            faltam = top_n - len(final_df)
-            logger.warning(f"Apenas {len(final_df)} cidades encontradas no RAG. Buscando {faltam} na OpenAI.")
-            sugestoes_openai = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltam)
-
-            if not sugestoes_openai.empty:
-                colunas_necessarias = ["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal"]
-                for coluna in colunas_necessarias:
-                    if coluna not in sugestoes_openai.columns:
-                        sugestoes_openai[coluna] = 0
-
-                if "Salario_Medio_R$" not in sugestoes_openai.columns:
-                    sugestoes_openai["Salario_Medio_R$"] = 5500.0  # valor médio estimado
-
-                extras = sugestoes_openai[colunas_necessarias + ["Salario_Medio_R$"]].copy()
-
-                final_df = pd.concat([final_df, extras], ignore_index=True)
-
-
-                # Garante que haja 30 cidades
-
-                if len(final_df) < top_n:
-                    logger.warning(f"Apenas {len(final_df)} cidades foram obtidas. Preenchendo com cidades fictícias.")
-                    for i in range(top_n - len(final_df)):
-                        final_df.loc[len(final_df)] = {
-                            "Municipio": f"CidadeFicticia{i+1}",
-                            "Populacao": 0,
-                            "PIB": 0,
-                            "Empresas_Segmento": 0,
-                            "Empresas_Perfil_Canal": 0,
-                            "Salario_Medio_R$": 0
-                        }
-
-        return final_df.head(top_n)
-
-    except Exception as e:
-        logger.error(f"Erro ao processar segmentos '{segmentos}': {e}")
-        return pd.DataFrame(columns=["Municipio", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"])
-
-def gerar_tabela_html(dataframe):
+def gerar_tabela_html(dataframe: pd.DataFrame) -> str:
     if dataframe.empty:
         return """
         <div class='paragrafo'>
-            <h3 style='color:#5e17eb;'>📍 Nenhum município encontrado para este segmento.</h3>
-            <p>Revise o segmento informado ou tente outro termo mais genérico.</p>
+            <h3 style='color:#5e17eb;'>📍 Nenhum município encontrado para os segmentos informados.</h3>
+            <p>Revise os termos utilizados ou tente um conjunto de segmentos mais amplo.</p>
         </div>
         """
+
     linhas = ""
     for _, row in dataframe.iterrows():
         linhas += (
             f"<tr>"
             f"<td>{row['Municipio']}</td>"
-            f"<td>{row['Populacao']:,}</td>"
-            f"<td>R${row['PIB']:.2f} bi</td>"
             f"<td>{int(row['Empresas_Segmento'])}</td>"
             f"<td>{int(row['Empresas_Perfil_Canal'])}</td>"
-            f"<td>R${row['Salario_Medio_R$']:.2f}</td>"
             f"</tr>"
         )
 
     return f"""
     <div class='paragrafo'>
-        <h3 style='color:#5e17eb;'>📍 Top 30 Municípios com Maior Potencial para Canais</h3>
+        <h3 style='color:#5e17eb;'>📍 Top 30 Municípios com Maior Potencial por Segmentos</h3>
         <table border='0' width='100%' style='font-size:15px; line-height:1.5; border-collapse:collapse; margin-top:15px;'>
             <thead style='background:#f0f0f0;'>
                 <tr>
                     <th align='left'>Município</th>
-                    <th align='left'>População</th>
-                    <th align='left'>PIB</th>
-                    <th align='left'>Empresas no Segmento</th>
+                    <th align='left'>Empresas no Segmento da Empresa</th>
                     <th align='left'>Empresas com Perfil de Canal</th>
-                    <th align='left'>Salário Médio (R$)</th>
                 </tr>
             </thead>
             <tbody>
