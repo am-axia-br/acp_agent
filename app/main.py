@@ -271,10 +271,7 @@ def gerar_prompt(data):
 
     # 🔍 CIDADES – RAG + OpenAI até 30, sem fictícias
 
-    segmentos_str = ", ".join(segmentos_normalizados)
-
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
-
 
     for col in ["Municipio", "Estado", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
         if col not in cidades_df.columns:
