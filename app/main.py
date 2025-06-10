@@ -285,6 +285,8 @@ def gerar_prompt(data):
 
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
 
+    logger.warning(f"Colunas retornadas pelo DataFrame: {cidades_df.columns}")
+
     for col in ["Municipio", "Estado", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
         if col not in cidades_df.columns:
             cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
@@ -301,6 +303,11 @@ def gerar_prompt(data):
                 cidades_df_extra[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
 
         cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
+
+        for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
+            if col not in cidades_df.columns:
+                cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
+
         cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
 
     cidades_html = gerar_tabela_html(cidades_df)
