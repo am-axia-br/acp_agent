@@ -14,6 +14,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 COLUNA_ATIVIDADE = "Seções e divisões da classificação de atividades"
 
+STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
+
 # Cache para embeddings
 embedding_cache_path = "embedding_cache.json"
 if os.path.exists(embedding_cache_path):
@@ -47,8 +49,6 @@ def cosine_similarity(v1, v2):
 sheets_dict = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
 sheet_names = list(sheets_dict.keys())
 
-
-STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
 equivalencias_semanticas = {
     "agronegócio": ["agropecuária", "agricultura", "pecuária", "produção rural", "cultivo", "plantação", "fazenda"],
