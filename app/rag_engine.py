@@ -298,7 +298,13 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PI
         )
         import io
         tabela_csv = resposta.choices[0].message.content.strip()
-        df = pd.read_csv(io.StringIO(tabela_csv))
+
+        try:
+            df = pd.read_csv(io.StringIO(tabela_csv))
+        except Exception as e:
+            logger.error(f"Erro ao ler CSV gerado pela OpenAI: {e}\\nConteúdo recebido:\\n{tabela_csv}")
+        return pd.DataFrame()
+
         return df
     except Exception as e:
         logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
