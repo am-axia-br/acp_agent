@@ -16,8 +16,6 @@ from openai import OpenAI
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
-segmentos_lista = []
-
 from rag_engine import (
     filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento,
     gerar_tabela_html,
@@ -246,6 +244,9 @@ def gerar_prompt(data):
     ticket_medio_str = respostas[7]
     ciclo_vendas = respostas[8]
     meta_clientes = respostas[9]
+
+    if isinstance(segmentos_raw, list):
+        segmentos_raw = " ".join(segmentos_raw)
 
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
 
