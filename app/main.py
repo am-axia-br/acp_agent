@@ -286,6 +286,16 @@ def gerar_prompt(data):
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
 
 
+    logger.warning(f"[DEBUG] Colunas recebidas do DataFrame: {list(cidades_df.columns)}")
+
+    # Previne falhas ao acessar colunas esperadas
+    colunas_obrigatorias = ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]
+    for col in colunas_obrigatorias:
+        if col not in cidades_df.columns:
+            logger.warning(f"Coluna ausente: {col}. Criando com valor padrão.")
+            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
+
+
     import logging
     logger = logging.getLogger("main")
 
