@@ -374,7 +374,7 @@ def gerar_prompt(data):
         faltantes = 30 - len(cidades_df)
         cidades_df_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
 
-        for col in ["Municipio", "Estado", "Populacao", "PIB", "Empresas_Segmento", "Empresas_Perfil_Canal", "Salario_Medio_R$"]:
+        for col in ["Municipio","Empresas_Segmento", "Empresas_Perfil_Canal"]:
             if col not in cidades_df_extra.columns:
                 cidades_df_extra[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
 

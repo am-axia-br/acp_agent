@@ -283,8 +283,8 @@ def buscar_cidades_na_openai(segmentos: list[str], cidades_existentes: list[str]
 Considere segmentos de atuação: {", ".join(segmentos)}.
 Com base nisso, sugira {faltantes} cidades brasileiras com grande potencial de mercado para empresas desses segmentos.
 Evite repetir as cidades já listadas: {", ".join(cidades_existentes)}.
-Para cada cidade, retorne: Nome da Cidade, Estado, População, PIB estimado, Número de empresas no segmento, Número de empresas com perfil para ser canal.
-Retorne os dados em uma tabela CSV com colunas: Municipio, Estado, Populacao, PIB, Empresas_Segmento, Empresas_Perfil_Canal
+Para cada cidade, retorne: Nome da Cidade, Número de empresas no segmento, Número de empresas com perfil para ser canal.
+Retorne os dados em uma tabela CSV com colunas: Municipio, Empresas_Segmento, Empresas_Perfil_Canal
     """
     try:
         resposta = client.chat.completions.create(
