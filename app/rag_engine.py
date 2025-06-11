@@ -301,11 +301,11 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Empresas_Segmento, Em
 
         try:
             df = pd.read_csv(io.StringIO(tabela_csv))
+            return df  # ✅ Retorna apenas se o CSV foi lido com sucesso
         except Exception as e:
-            logger.error(f"Erro ao ler CSV gerado pela OpenAI: {e}\\nConteúdo recebido:\\n{tabela_csv}")
-        return pd.DataFrame()
-
-        return df
+            logger.error(f"Erro ao ler CSV gerado pela OpenAI: {e}\nConteúdo recebido:\n{tabela_csv}")
+            return pd.DataFrame()  # Só retorna vazio se deu erro
+        
     except Exception as e:
         logger.error(f"Erro ao buscar cidades com OpenAI: {e}")
         return pd.DataFrame()
