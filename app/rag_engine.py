@@ -46,6 +46,8 @@ def cosine_similarity(v1, v2):
 
 # Lê todas as abas do arquivo Excel
 
+excel_file = pd.ExcelFile(arquivo_excel)
+sheet_names = excel_file.sheet_names
 logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
 
 for nome, df in sheets_dict.items():
