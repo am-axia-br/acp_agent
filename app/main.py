@@ -292,6 +292,9 @@ def gerar_prompt(data):
 
     # 🔍 CIDADES – RAG + OpenAI até 30, sem fictícias
 
+    if isinstance(segmento_original, list):
+        segmento_original = " ".join(segmento_original)
+
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
 
 

@@ -347,12 +347,16 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: i
     logger.warning(f"[DEBUG] Segmentos processados para busca: {segmentos_lista}")
 
     
-    # Converte entrada textual em lista de termos (ex: "agro, logística")
+    # Converte entrada textual em lista de termos
+    
     segmentos_lista = [
         seg.strip().lower()
         for seg in segmentos_textuais.replace(",", " ").split()
         if seg.strip().lower() not in STOPWORDS and len(seg.strip()) > 2
     ]
+
+    logger.warning(f"[DEBUG] Segmentos processados para busca: {segmentos_lista}")
+
 
     if not segmentos_lista:
         logger.warning("Nenhum segmento válido informado.")
