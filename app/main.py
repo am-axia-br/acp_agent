@@ -251,8 +251,12 @@ def gerar_prompt(data):
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
 
     segmentos_lista = [s.strip().lower() for s in re.split(r"[,\s]+", segmentos_raw) if s.lower() not in STOPWORDS and len(s.strip()) > 2]
-    segmentos_normalizados = normalizar_segmentos_inteligente(segmentos_lista, descricoes_cnae, embeddings_cnae)
 
+    segmentos_normalizados = []
+    
+    for termo in segmentos_lista:
+        normalizados = normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae)
+        segmentos_normalizados.extend(normalizados)
 
     segmento = truncar_texto(segmentos_raw)
     clientes = truncar_texto(clientes)
