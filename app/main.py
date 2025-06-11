@@ -285,6 +285,22 @@ def gerar_prompt(data):
 
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
 
+    # Proteção contra colunas ausentes no DataFrame
+    import logging
+    logger = logging.getLogger("main")
+
+    logger.warning(f"[DEBUG] Colunas retornadas: {list(cidades_df.columns)}")
+
+    for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
+        if col not in cidades_df.columns:
+            logger.warning(f"Coluna ausente: {col} - preenchendo com valor padrão.")
+            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
+
+    try:
+        cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
+    except Exception as e:
+        logger.error(f"[FALHA] Erro ao ordenar DataFrame por 'Empresas_Segmento': {e}")
+
     logger.warning(f"[DEBUG] Colunas recebidas: {list(cidades_df.columns)}")
 
     for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
