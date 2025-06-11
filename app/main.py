@@ -285,6 +285,16 @@ def gerar_prompt(data):
 
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
 
+
+    if cidades_df.empty or any(col not in cidades_df.columns for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]):
+        logger.warning("DataFrame de cidades incompleto. Criando estrutura padrão.")
+        cidades_df = pd.DataFrame({
+            "Municipio": ["CidadeDesconhecida"],
+            "Empresas_Segmento": [0],
+            "Empresas_Perfil_Canal": [0]
+    })
+
+
     # Proteção contra colunas ausentes no DataFrame
     import logging
     logger = logging.getLogger("main")

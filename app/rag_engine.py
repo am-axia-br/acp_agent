@@ -46,6 +46,11 @@ def cosine_similarity(v1, v2):
 
 # Lê todas as abas do arquivo Excel
 
+logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
+
+for nome, df in sheets_dict.items():
+    logger.warning(f"[DEBUG] {nome}: colunas = {df.columns.tolist()}")
+
 sheets_dict = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
 sheet_names = list(sheets_dict.keys())
 
@@ -136,9 +141,20 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
     #   - Empresas_Perfil_Canal (segmentos fixos de canais)
 
 
-    termos_cliente = expandir_termos_por_equivalencia(segmentos_cliente, equivalencias_semanticas)
-    termos_canais = expandir_termos_por_equivalencia(list(equivalencias_semanticas_canais.keys()), equivalencias_semanticas_canais)
+    termos_cliente = set()
 
+    for termo in segmentos_cliente:
+        termos_cliente.update(normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae))
+
+
+    segmentos_canais_input = list(equivalencias_semanticas_canais.keys())
+
+    termos_canais = set()
+    
+    for termo in segmentos_canais_input:
+        normalizados = normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae)   
+        termos_canais.update(normalizados)
+    
     resultados = {}
 
     for nome_aba in sheet_names:
@@ -163,24 +179,24 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
 
         df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
 
-        for _, row in df.iterrows():
-            cidade = row["Municipio"]
-            atividade = row[COLUNA_ATIVIDADE]
-            unidades = row["Unidades_Locais"]
+    contagem_segmento = contar_empresas_por_segmento(df, termos_cliente)
+    contagem_canal = contar_empresas_por_segmento(df, termos_canais)
 
-            if cidade not in resultados:
-                resultados[cidade] = {"Empresas_Segmento": 0, "Empresas_Perfil_Canal": 0}
+    for cidade in set(contagem_segmento.keys()).union(contagem_canal.keys()):
+        if cidade not in resultados:
+            resultados[cidade] = {"Empresas_Segmento": 0, "Empresas_Perfil_Canal": 0}
 
-            if any(termo in atividade for termo in termos_cliente):
-                resultados[cidade]["Empresas_Segmento"] += unidades
-
-            if any(termo in atividade for termo in termos_canais):
-                resultados[cidade]["Empresas_Perfil_Canal"] += unidades
+        resultados[cidade]["Empresas_Segmento"] += contagem_segmento.get(cidade, 0)
+        resultados[cidade]["Empresas_Perfil_Canal"] += contagem_canal.get(cidade, 0)
 
     df_final = pd.DataFrame([
         {"Municipio": k, "Empresas_Segmento": v["Empresas_Segmento"], "Empresas_Perfil_Canal": v["Empresas_Perfil_Canal"]}
         for k, v in resultados.items()
-    ])
+
+        ])
+
+    logger.warning(f"[DEBUG] Linhas encontradas: {len(df_final)}")
+    logger.warning(f"[DEBUG] Amostra do DataFrame:\n{df_final.head()}")
 
     return df_final.sort_values(by="Empresas_Segmento", ascending=False).head(top_n).reset_index(drop=True)
 
@@ -235,6 +251,7 @@ def normalizar_segmentos_inteligente(termo_usuario: str, descricoes_cnae: list[s
     termo = termo_usuario.strip().lower()
 
     # 1. Verifica se existe correspondência direta no dicionário de equivalências
+
     for chave, lista in equivalencias_semanticas.items():
         if termo == chave or termo in lista:
             return list(set([chave] + lista))
@@ -312,10 +329,15 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Empresas_Segmento, Em
 
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: int = 30) -> pd.DataFrame:
+    
     """
     Função intermediária que transforma texto solto em lista de segmentos e
     executa a busca por municípios com base no novo motor inteligente.
     """
+
+    logger.warning(f"[DEBUG] Segmentos processados para busca: {segmentos_lista}")
+
+    
     # Converte entrada textual em lista de termos (ex: "agro, logística")
     segmentos_lista = [
         seg.strip().lower()
@@ -388,3 +410,23 @@ except Exception as e:
     embeddings_cnae = []
     logger.warning(f"Erro ao preparar descrições e embeddings globais: {e}")
 
+import re
+
+def cnae_bate_com_qualquer_termo(cnae: str, termos: set[str]) -> bool:
+    tokens = set(re.findall(r"\w+", cnae.lower()))
+    return any(t in tokens for t in termos)
+
+def contar_empresas_por_segmento(df: pd.DataFrame, termos: set[str], coluna_atividade: str = COLUNA_ATIVIDADE) -> dict[str, int]:
+    contagem = {}
+    for _, row in df.iterrows():
+        cidade = row["Municipio"]
+        atividade = str(row[coluna_atividade]).lower()
+        unidades = row["Unidades_Locais"]
+
+        if cidade not in contagem:
+            contagem[cidade] = 0
+
+        if cnae_bate_com_qualquer_termo(atividade, termos):
+            contagem[cidade] += unidades
+
+    return contagem
