@@ -245,12 +245,19 @@ def gerar_prompt(data):
     ciclo_vendas = respostas[8]
     meta_clientes = respostas[9]
 
+
     if isinstance(segmentos_raw, list):
         segmentos_raw = " ".join(segmentos_raw)
 
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
 
-    segmentos_lista = [s.strip().lower() for s in re.split(r"[,\s]+", segmentos_raw) if s.lower() not in STOPWORDS and len(s.strip()) > 2]
+# ✅ Definir segmentos_lista aqui de forma segura
+
+    segmentos_lista = [
+        seg.strip().lower()
+        for seg in re.split(r"[,\s]+", segmento_original)
+        if seg.strip().lower() not in STOPWORDS and len(seg.strip()) > 2
+    ]
 
     segmentos_normalizados = []
     
