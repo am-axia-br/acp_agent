@@ -16,6 +16,12 @@ COLUNA_ATIVIDADE = "Seções e divisões da classificação de atividades"
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
+arquivo_excel = "Tabela 14.xlsx"  # ou variável dinâmica se estiver usando uploads
+sheets_dict = pd.read_excel(arquivo_excel, sheet_name=None)
+sheet_names = list(sheets_dict.keys())
+
+
+
 # Cache para embeddings
 embedding_cache_path = "embedding_cache.json"
 if os.path.exists(embedding_cache_path):
@@ -46,15 +52,11 @@ def cosine_similarity(v1, v2):
 
 # Lê todas as abas do arquivo Excel
 
-excel_file = pd.ExcelFile(arquivo_excel)
-sheet_names = excel_file.sheet_names
-logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
+
 
 for nome, df in sheets_dict.items():
     logger.warning(f"[DEBUG] {nome}: colunas = {df.columns.tolist()}")
 
-sheets_dict = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
-sheet_names = list(sheets_dict.keys())
 
 
 equivalencias_semanticas = {
@@ -141,6 +143,11 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
     #   - Municipio
     #   - Empresas_Segmento (segmentos da empresa)
     #   - Empresas_Perfil_Canal (segmentos fixos de canais)
+
+    excel_file = pd.ExcelFile(arquivo_excel)
+    sheet_names = excel_file.sheet_names
+    logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
+
 
 
     termos_cliente = set()
