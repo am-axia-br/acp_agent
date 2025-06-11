@@ -16,6 +16,8 @@ from openai import OpenAI
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
+segmentos_lista = []
+
 from rag_engine import (
     filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento,
     gerar_tabela_html,
@@ -247,7 +249,9 @@ def gerar_prompt(data):
 
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
 
-    segmentos_normalizados = [s.strip().lower() for s in re.split(r"[,\s]+", segmentos_raw) if s.lower() not in STOPWORDS and len(s.strip()) > 2]
+    segmentos_lista = [s.strip().lower() for s in re.split(r"[,\s]+", segmentos_raw) if s.lower() not in STOPWORDS and len(s.strip()) > 2]
+    segmentos_normalizados = normalizar_segmentos_inteligente(segmentos_lista, descricoes_cnae, embeddings_cnae)
+
 
     segmento = truncar_texto(segmentos_raw)
     clientes = truncar_texto(clientes)
@@ -382,7 +386,7 @@ def gerar_prompt(data):
     if len(cidades_df) < 30:
         cidades_existentes = cidades_df["Municipio"].tolist()
         faltantes = 30 - len(cidades_df)
-        cidades_df_extra = buscar_cidades_na_openai(segmentos_normalizados, cidades_existentes, faltantes)
+        cidades_df_extra = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltantes)
 
         for col in ["Municipio","Empresas_Segmento", "Empresas_Perfil_Canal"]:
             if col not in cidades_df_extra.columns:
