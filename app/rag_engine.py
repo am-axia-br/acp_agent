@@ -344,18 +344,13 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: i
     executa a busca por municípios com base no novo motor inteligente.
     """
 
-    logger.warning(f"[DEBUG] Segmentos processados para busca: {segmentos_lista}")
-
-    
-    # Converte entrada textual em lista de termos
-    
     segmentos_lista = [
         seg.strip().lower()
         for seg in segmentos_textuais.replace(",", " ").split()
-        if seg.strip().lower() not in STOPWORDS and len(seg.strip()) > 2
+            if seg.strip().lower() not in STOPWORDS and len(seg.strip()) > 2
     ]
 
-    logger.warning(f"[DEBUG] Segmentos processados para busca: {segmentos_lista}")
+    logger.warning(f"[DEBUG] Segmentos processados para busca: {segmentos_lista}")  # ✅ AGORA SIM
 
 
     if not segmentos_lista:
