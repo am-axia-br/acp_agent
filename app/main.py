@@ -392,6 +392,15 @@ def gerar_prompt(data):
 
 
     if len(cidades_df) < 30:
+
+        if cidades_df.empty or "Municipio" not in cidades_df.columns:
+            logger.warning("DataFrame de cidades sem coluna 'Municipio'. Criando estrutura padrão.")
+            cidades_df = pd.DataFrame({
+                "Municipio": ["CidadeDesconhecida"],
+                "Empresas_Segmento": [0],
+                "Empresas_Perfil_Canal": [0]
+            })
+
         cidades_existentes = cidades_df["Municipio"].tolist()
         faltantes = 30 - len(cidades_df)
         cidades_df_extra = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltantes)
