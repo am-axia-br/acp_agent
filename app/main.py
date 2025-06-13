@@ -229,10 +229,14 @@ def truncar_texto(texto, limite=500):
     return texto[:limite] + "..." if len(texto) > limite else texto
 
 def gerar_prompt(data):
+    
     origem = data.get("origem", "")
     nome = data["nome"]
     empresa = data["empresa"]
     respostas = data["diagnostico"]
+
+    if len(respostas) < 2:
+        raise ValueError("Respostas insuficientes para gerar o prompt.")
 
     site = respostas[0]
     segmentos_raw = respostas[1]

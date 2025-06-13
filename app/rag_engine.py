@@ -12,7 +12,7 @@ from difflib import get_close_matches
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-COLUNA_ATIVIDADE = "Seções e divisões da classificação de atividades"
+COLUNA_ATIVIDADE = "Nome do CNAE"
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
@@ -169,16 +169,13 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
     for nome_aba in sheet_names:
         df = sheets_dict[nome_aba].copy()
 
-        if COLUNA_ATIVIDADE not in df.columns:
+
+        if not {"Municipio", "Nome do CNAE", "Número de unidades locais"}.issubset(df.columns):
+            logger.warning(f"[ERRO] Colunas esperadas não encontradas na aba {nome_aba}")
             continue
 
-        df.rename(columns={"Seções e divisões da classificação de atividades": COLUNA_ATIVIDADE}, inplace=True)
-
-        df.columns = [
-            "Municipio", "Codigo_CNAE", COLUNA_ATIVIDADE,
-            "Unidades_Locais", "Pessoal_Total", "Pessoal_Assalariado", "Assalariado_Medio",
-            "Remuneracao_Mil_R$", "Salario_Medio_SM", "Salario_Medio_R$"
-        ]
+        df = df[["Municipio", "Nome do CNAE", "Número de unidades locais"]]
+        df = df.rename(columns={"Nome do CNAE": COLUNA_ATIVIDADE, "Número de unidades locais": "Unidades_Locais"})
 
         df = df[df["Municipio"].notna()]
         df = df[~df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
@@ -408,9 +405,11 @@ try:
     descricoes_cnae = set()
     for nome_aba in sheet_names:
         df_sheet = sheets_dict[nome_aba]
-        if COLUNA_ATIVIDADE in df_sheet.columns:
-            descricoes = df_sheet[COLUNA_ATIVIDADE].dropna().unique().tolist()
+
+        if "Nome do CNAE" in df_sheet.columns:
+            descricoes = df_sheet["Nome do CNAE"].dropna().unique().tolist()
             descricoes_cnae.update(descricoes)
+
     descricoes_cnae = list(descricoes_cnae)
     embeddings_cnae = [get_embedding(desc) for desc in descricoes_cnae]
 except Exception as e:
@@ -424,17 +423,15 @@ def cnae_bate_com_qualquer_termo(cnae: str, termos: set[str]) -> bool:
     tokens = set(re.findall(r"\w+", cnae.lower()))
     return any(t in tokens for t in termos)
 
-def contar_empresas_por_segmento(df: pd.DataFrame, termos: set[str], coluna_atividade: str = COLUNA_ATIVIDADE) -> dict[str, int]:
+def contar_empresas_por_segmento(df: pd.DataFrame, termos: set[str]) -> dict[str, int]:
     contagem = {}
     for _, row in df.iterrows():
         cidade = row["Municipio"]
-        atividade = str(row[coluna_atividade]).lower()
+        atividade = str(row["Nome do CNAE"]).lower()
         unidades = row["Unidades_Locais"]
-
         if cidade not in contagem:
             contagem[cidade] = 0
-
         if cnae_bate_com_qualquer_termo(atividade, termos):
             contagem[cidade] += unidades
-
     return contagem
+
