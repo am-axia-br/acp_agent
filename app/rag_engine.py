@@ -166,7 +166,17 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
     resultados = {}
 
     for nome_aba in sheet_names:
-        df = sheets_dict[nome_aba].copy()
+
+        # Tenta encontrar a linha onde está o cabeçalho correto
+        
+        aba = sheets_dict[nome_aba]
+        linha_cabecalho = aba[aba.apply(lambda x: x.astype(str).str.contains("Municipio", case=False)).any(axis=1)].index.min()
+
+        if pd.isna(linha_cabecalho):
+            logger.warning(f"[ERRO] Cabeçalho não encontrado na aba {nome_aba}")
+            continue
+
+        df = pd.read_excel(caminho_arquivo, sheet_name=nome_aba, skiprows=linha_cabecalho)
 
         if not {"Municipio", "Nome do CNAE", "Número de unidades locais"}.issubset(df.columns):
             logger.warning(f"[ERRO] Colunas esperadas não encontradas na aba {nome_aba}")
