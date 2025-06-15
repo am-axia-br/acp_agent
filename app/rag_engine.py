@@ -134,7 +134,7 @@ def expandir_termos_por_equivalencia(lista_termos: list[str], base: dict) -> set
 
 
 def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n: int = 30):
-
+    
     #   Extrai informações das cidades com base nos segmentos informados pelo cliente (Empresa) 
     #   e nos segmentos fixos definidos para canais de vendas.
 
@@ -144,17 +144,16 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
     #   - Empresas_Segmento (segmentos da empresa)
     #   - Empresas_Perfil_Canal (segmentos fixos de canais)
 
+    dfs_processados = []  # ✅ Adicione aqui antes do for
+
     excel_file = pd.ExcelFile(arquivo_excel)
     sheet_names = excel_file.sheet_names
     logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
-
-
 
     termos_cliente = set()
 
     for termo in segmentos_cliente:
         termos_cliente.update(normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae))
-
 
     segmentos_canais_input = list(equivalencias_semanticas_canais.keys())
 
@@ -168,7 +167,6 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
 
     for nome_aba in sheet_names:
         df = sheets_dict[nome_aba].copy()
-
 
         if not {"Municipio", "Nome do CNAE", "Número de unidades locais"}.issubset(df.columns):
             logger.warning(f"[ERRO] Colunas esperadas não encontradas na aba {nome_aba}")
@@ -185,9 +183,21 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
 
         df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
 
-    contagem_segmento = contar_empresas_por_segmento(df, termos_cliente)
-    contagem_canal = contar_empresas_por_segmento(df, termos_canais)
+        contagem_segmento = contar_empresas_por_segmento(df, termos_cliente)
+        contagem_canal = contar_empresas_por_segmento(df, termos_canais)
 
+        dfs_processados.append(df)
+
+    if not dfs_processados:
+        logger.warning("Nenhuma aba com dados válidos foi processada.")
+        return pd.DataFrame(columns=["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"])
+
+    df_total = pd.concat(dfs_processados, ignore_index=True)  # ✅ Junta todas as abas válidas
+
+    contagem_segmento = contar_empresas_por_segmento(df_total, termos_cliente)
+    contagem_canal = contar_empresas_por_segmento(df_total, termos_canais)
+    
+    
     for cidade in set(contagem_segmento.keys()).union(contagem_canal.keys()):
         if cidade not in resultados:
             resultados[cidade] = {"Empresas_Segmento": 0, "Empresas_Perfil_Canal": 0}
@@ -427,7 +437,7 @@ def contar_empresas_por_segmento(df: pd.DataFrame, termos: set[str]) -> dict[str
     contagem = {}
     for _, row in df.iterrows():
         cidade = row["Municipio"]
-        atividade = str(row["Nome do CNAE"]).lower()
+        atividade = str(row[COLUNA_ATIVIDADE]).lower()
         unidades = row["Unidades_Locais"]
         if cidade not in contagem:
             contagem[cidade] = 0
