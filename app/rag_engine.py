@@ -148,6 +148,7 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
 
     excel_file = pd.ExcelFile(arquivo_excel)
     sheet_names = excel_file.sheet_names
+    
     logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
 
     termos_cliente = set()
@@ -170,13 +171,14 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
         # Tenta encontrar a linha onde está o cabeçalho correto
 
         aba = sheets_dict[nome_aba]
+
         linha_cabecalho = aba[aba.apply(lambda x: x.astype(str).str.contains("Municipio", case=False)).any(axis=1)].index.min()
 
         if pd.isna(linha_cabecalho):
             logger.warning(f"[ERRO] Cabeçalho não encontrado na aba {nome_aba}")
             continue
 
-        df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=1)
+        df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=linha_cabecalho)
 
         # Verifica se as colunas necessárias estão presentes
 
@@ -195,7 +197,7 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
         df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
         df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
         df = df[df["Unidades_Locais"].notna()]
-        
+
         df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
 
         df["Origem"] = "Excel"
@@ -414,7 +416,7 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: i
         logger.warning("Nenhum município encontrado para os segmentos informados.")
         return df_resultado
 
-    logger.warning(f"[DEBUG FINAL] Total cidades Excel: {len(cidades_df)}")
+    logger.warning(f"[DEBUG FINAL] Total cidades Excel: {len(df_resultado)}")
 
 
 def gerar_tabela_html(dataframe: pd.DataFrame) -> str:
