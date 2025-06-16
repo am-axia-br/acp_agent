@@ -439,6 +439,9 @@ def gerar_prompt(data):
 
     cidades_html = gerar_tabela_html(cidades_df)
 
+    logger.warning(f"[DEBUG FINAL] Total cidades após OpenAI: {len(cidades_df)}")
+    logger.warning(f"[DEBUG FINAL] Cidades: {cidades_df['Municipio'].tolist()}")
+
     try:
         ticket = float(ticket_medio_str)
         ciclo = int(ciclo_vendas)

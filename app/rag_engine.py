@@ -178,6 +178,29 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
 
         df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=2)
 
+        # Verifica se as colunas necessárias estão presentes
+
+        colunas_esperadas = {"Municipio", "Nome do CNAE", "Número de unidades locais"}
+        
+        if not colunas_esperadas.issubset(df.columns):
+            logger.warning(f"[ERRO] Cabeçalho não encontrado na aba {nome_aba}")
+            continue
+
+        df = df[["Municipio", "Nome do CNAE", "Número de unidades locais"]]
+        
+        df = df.rename(columns={"Nome do CNAE": COLUNA_ATIVIDADE, "Número de unidades locais": "Unidades_Locais"})
+
+        df = df[df["Municipio"].notna()]
+        df = df[~df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
+        df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
+        df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
+        df = df[df["Unidades_Locais"].notna()]
+        df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
+
+        df["Origem"] = "Excel"
+        dfs_processados.append(df)
+
+
         if not {"Municipio", "Nome do CNAE", "Número de unidades locais"}.issubset(df.columns):
             logger.warning(f"[ERRO] Colunas esperadas não encontradas na aba {nome_aba}")
             continue
@@ -198,11 +221,20 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
 
         dfs_processados.append(df)
 
+
+        if not dfs_processados:
+            logger.error("❌ Nenhum DataFrame válido foi processado. Verifique os dados.")
+            return pd.DataFrame()
+
+
+
     if not dfs_processados:
         logger.warning("Nenhuma aba com dados válidos foi processada.")
         return pd.DataFrame(columns=["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"])
 
-    df_total = pd.concat(dfs_processados, ignore_index=True)  # ✅ Junta todas as abas válidas
+    
+    df_total = pd.concat(dfs_processados, ignore_index=True)
+    df_total["Municipio"] = df_total["Municipio"].astype(str).str.strip().str.title()
 
     contagem_segmento = contar_empresas_por_segmento(df_total, termos_cliente)
     contagem_canal = contar_empresas_por_segmento(df_total, termos_canais)
@@ -379,8 +411,9 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: i
 
     if df_resultado.empty:
         logger.warning("Nenhum município encontrado para os segmentos informados.")
+        return df_resultado
 
-    return df_resultado
+    logger.warning(f"[DEBUG FINAL] Total cidades Excel: {len(cidades_df)}")
 
 
 def gerar_tabela_html(dataframe: pd.DataFrame) -> str:
