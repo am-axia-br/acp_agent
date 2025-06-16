@@ -195,6 +195,7 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
         df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
         df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
         df = df[df["Unidades_Locais"].notna()]
+        
         df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
 
         df["Origem"] = "Excel"
