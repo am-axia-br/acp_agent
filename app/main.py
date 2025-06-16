@@ -25,8 +25,6 @@ from rag_engine import (
     buscar_cidades_na_openai
 )
 
-data = novo_diagnostico()  # ✅ isso sim está certo!
-
 from rag_parcerias import buscar_conhecimento
 
 def consultar_taxa_conversao_openai(segmentos):
@@ -59,19 +57,24 @@ Dê um número percentual para cada uma, no Brasil, em mercados B2B."""
         return 0.2
 
 
+# DEFINA A FUNÇÃO ANTES DE USÁ-LA
 def novo_diagnostico():
     return {
-        "origem": None,
         "nome": None,
         "empresa": None,
         "whatsapp": None,
         "email": None,
         "diagnostico": [],
         "etapa_atual": 0,
-        "finalizado": False,
         "iniciado": False,
-        "prompt": None
+        "municipios": [],
+        "resumo": "",
+        "mensagem_usuario": "",
+        "resposta_ia": ""
     }
+
+# VARIÁVEL GLOBAL
+data = novo_diagnostico()
 
 
 
