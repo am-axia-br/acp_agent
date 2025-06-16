@@ -319,10 +319,6 @@ def gerar_prompt(data):
     })
 
 
-    # Proteção contra colunas ausentes no DataFrame
-    import logging
-    logger = logging.getLogger("main")
-
     logger.warning(f"[DEBUG] Colunas retornadas: {list(cidades_df.columns)}")
 
     for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:

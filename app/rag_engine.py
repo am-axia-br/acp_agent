@@ -148,7 +148,7 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
 
     excel_file = pd.ExcelFile(arquivo_excel)
     sheet_names = excel_file.sheet_names
-    
+
     logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
 
     termos_cliente = set()
@@ -171,14 +171,18 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
         # Tenta encontrar a linha onde está o cabeçalho correto
 
         aba = sheets_dict[nome_aba]
+   
+        df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=1)
 
-        linha_cabecalho = aba[aba.apply(lambda x: x.astype(str).str.contains("Municipio", case=False)).any(axis=1)].index.min()
-
-        if pd.isna(linha_cabecalho):
-            logger.warning(f"[ERRO] Cabeçalho não encontrado na aba {nome_aba}")
+        try:
+            df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=1)
+            if "Municipio" not in df.columns:
+                logger.warning(f"[ERRO] Cabeçalho não encontrado corretamente na aba {nome_aba}")
+                continue
+        except Exception as e:
+            logger.error(f"[ERRO] Falha ao ler aba {nome_aba}: {e}")
             continue
 
-        df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=linha_cabecalho)
 
         # Verifica se as colunas necessárias estão presentes
 
@@ -201,8 +205,7 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
         df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
 
         df["Origem"] = "Excel"
-        dfs_processados.append(df)
-
+      
 
         if not {"Municipio", "Nome do CNAE", "Número de unidades locais"}.issubset(df.columns):
             logger.warning(f"[ERRO] Colunas esperadas não encontradas na aba {nome_aba}")
