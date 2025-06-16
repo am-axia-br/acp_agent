@@ -420,7 +420,8 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: i
         return df_resultado
 
     logger.warning(f"[DEBUG FINAL] Total cidades Excel: {len(df_resultado)}")
-
+    
+    return df_resultado
 
 def gerar_tabela_html(dataframe: pd.DataFrame) -> str:
     if dataframe.empty:
