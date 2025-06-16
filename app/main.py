@@ -520,8 +520,6 @@ Sua empresa está pronta para crescer com uma estratégia sólida de canais de v
 Entre em contato com a AC Partners e comece agora o onboarding comercial com especialistas.
 '''
 
-logger.warning(f"[DEBUG FINAL] Total de cidades no resumo: {len(cidades_df)}")
-logger.warning(f"[DEBUG FINAL] Amostra:\n{cidades_df.head()}")
 
 def chamar_llm(prompt):
     try:
