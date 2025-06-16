@@ -25,6 +25,7 @@ from rag_engine import (
     buscar_cidades_na_openai
 )
 
+data = novo_diagnostico()  # ✅ isso sim está certo!
 
 from rag_parcerias import buscar_conhecimento
 
@@ -72,8 +73,6 @@ def novo_diagnostico():
         "prompt": None
     }
 
-data = novo_diagnostico()  # ✅ isso sim está certo!
-
 
 
 load_dotenv()
@@ -93,7 +92,6 @@ def indexar_automaticamente():
     except Exception as e:
         logger.warning(f"Indexacao automatica ignorada: {e}")
 
-data = novo_diagnostico
 
 
 @app.get("/")
@@ -229,7 +227,7 @@ def truncar_texto(texto, limite=500):
     return texto[:limite] + "..." if len(texto) > limite else texto
 
 def gerar_prompt(data):
-    
+
     origem = data.get("origem", "")
     nome = data["nome"]
     empresa = data["empresa"]
