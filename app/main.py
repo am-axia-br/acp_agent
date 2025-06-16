@@ -422,6 +422,14 @@ def gerar_prompt(data):
                 cidades_df_extra[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
 
         cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
+        cidades_df = cidades_df.drop_duplicates(subset="Municipio").reset_index(drop=True)
+
+        faltam = 30 - len(cidades_df)
+        if faltam > 0:
+            logger.warning(f"Ainda faltam {faltam} cidades. Chamando OpenAI novamente.")
+            cidades_df_extra = buscar_cidades_na_openai(segmentos_lista, cidades_df["Municipio"].tolist(), faltam)
+            cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True).drop_duplicates(subset="Municipio").reset_index(drop=True)
+
 
         for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
             if col not in cidades_df.columns:
@@ -512,6 +520,8 @@ Sua empresa está pronta para crescer com uma estratégia sólida de canais de v
 Entre em contato com a AC Partners e comece agora o onboarding comercial com especialistas.
 '''
 
+logger.warning(f"[DEBUG FINAL] Total de cidades no resumo: {len(cidades_df)}")
+logger.warning(f"[DEBUG FINAL] Amostra:\n{cidades_df.head()}")
 
 def chamar_llm(prompt):
     try:

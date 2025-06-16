@@ -176,7 +176,7 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
             logger.warning(f"[ERRO] Cabeçalho não encontrado na aba {nome_aba}")
             continue
 
-        df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=1)
+        df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=2)
 
         if not {"Municipio", "Nome do CNAE", "Número de unidades locais"}.issubset(df.columns):
             logger.warning(f"[ERRO] Colunas esperadas não encontradas na aba {nome_aba}")
