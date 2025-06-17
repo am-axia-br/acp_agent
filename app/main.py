@@ -51,10 +51,11 @@ Dê um número percentual para cada uma, no Brasil, em mercados B2B."""
             return p_para_o * o_para_v  # taxa final composta
         else:
             logger.warning("Taxa de conversão não encontrada, usando padrão 20%")
-            return 0.2
+            return 0.2 if isinstance(segmentos, list) else 0.2
     except Exception as e:
         logger.error(f"Erro ao consultar taxa de conversao: {str(e)}")
-        return 0.2
+        return 0.2 if isinstance(segmentos, list) else 0.2
+
 
 
 # DEFINA A FUNÇÃO ANTES DE USÁ-LA
@@ -447,6 +448,10 @@ def gerar_prompt(data):
         raise ValueError(f"Erro ao converter valores numericos: {str(e)}") from e
 
     conversao = consultar_taxa_conversao_openai(segmentos_normalizados)
+
+    if not isinstance(conversao, (float, int)) or conversao == 0:
+        logger.warning(f"Conversão inválida detectada: {conversao}. Usando valor padrão 0.2")
+        conversao = 0.2
 
     oportunidades = int(novos_clientes / conversao)
     prospeccoes = int(oportunidades / conversao)
