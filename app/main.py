@@ -309,6 +309,12 @@ def gerar_prompt(data):
 
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
 
+    # Forçar conversão das colunas para número inteiro
+
+    for col in ["Empresas_Segmento", "Empresas_Perfil_Canal"]:
+        if col in cidades_df.columns:
+            cidades_df[col] = pd.to_numeric(cidades_df[col], errors="coerce").fillna(0).astype(int)
+
 
     if cidades_df.empty or any(col not in cidades_df.columns for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]):
         logger.warning("DataFrame de cidades incompleto. Criando estrutura padrão.")
