@@ -371,9 +371,6 @@ def gerar_prompt(data):
             cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
 
 
-    import logging
-    logger = logging.getLogger("main")
-
     logger.warning(f"Colunas do DataFrame retornado: {list(cidades_df.columns)}")
 
     # Corrige ausência das colunas obrigatórias
@@ -421,6 +418,7 @@ def gerar_prompt(data):
         cidades_df = cidades_df.drop_duplicates(subset="Municipio").reset_index(drop=True)
 
         faltam = 30 - len(cidades_df)
+
         if faltam > 0:
             logger.warning(f"Ainda faltam {faltam} cidades. Chamando OpenAI novamente.")
             cidades_df_extra = buscar_cidades_na_openai(segmentos_lista, cidades_df["Municipio"].tolist(), faltam)
