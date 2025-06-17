@@ -1,6 +1,3 @@
-from log_config import get_logger
-logger = get_logger(__name__)
-
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +12,9 @@ from mail import enviar_email
 from openai import OpenAI
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
+
+import logging
+logger = logging.getLogger(__name__)
 
 from rag_engine import (
     filtrar_municipios_por_segmentos_multiplos as filtrar_municipios_por_segmento,
