@@ -175,7 +175,6 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
         df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=1)
 
         try:
-            df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=1)
             if "Municipio" not in df.columns:
                 logger.warning(f"[ERRO] Cabeçalho não encontrado corretamente na aba {nome_aba}")
                 continue
@@ -380,8 +379,28 @@ Retorne os dados em uma tabela CSV com colunas: Municipio, Empresas_Segmento, Em
         import io
         tabela_csv = resposta.choices[0].message.content.strip()
 
+        import re
+        match = re.search(r"```csv\s*(.*?)```", tabela_csv, re.DOTALL)
+        if match:
+            tabela_csv = match.group(1).strip()
+
         try:
-            df = pd.read_csv(io.StringIO(tabela_csv))
+            import csv
+            from io import StringIO
+
+            reader = csv.reader(StringIO(tabela_csv))
+            rows = list(reader)
+
+            # Detecta o número correto de colunas a partir do cabeçalho
+            header = rows[0]
+            expected_len = len(header)
+
+            # Filtra apenas linhas com o número correto de colunas
+            rows_filtradas = [row for row in rows if len(row) == expected_len]
+
+            # Constrói o DataFrame apenas com linhas válidas
+            df = pd.DataFrame(rows_filtradas[1:], columns=header)
+
             return df  # ✅ Retorna apenas se o CSV foi lido com sucesso
         except Exception as e:
             logger.error(f"Erro ao ler CSV gerado pela OpenAI: {e}\nConteúdo recebido:\n{tabela_csv}")
@@ -420,7 +439,7 @@ def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: i
         return df_resultado
 
     logger.warning(f"[DEBUG FINAL] Total cidades Excel: {len(df_resultado)}")
-    
+
     return df_resultado
 
 def gerar_tabela_html(dataframe: pd.DataFrame) -> str:
