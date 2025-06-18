@@ -16,9 +16,33 @@ COLUNA_ATIVIDADE = "Nome do CNAE"
 
 STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
 
-arquivo_excel = "Tabela 14.xlsx"  # ou variável dinâmica se estiver usando uploads
-sheets_dict = pd.read_excel(arquivo_excel, sheet_name=None)
-sheet_names = list(sheets_dict.keys())
+arquivo_excel = "Tabela 14.xlsx"
+xls = pd.ExcelFile(arquivo_excel)
+
+dados_combinados = []
+sheet_names = xls.sheet_names
+sheets_dict = {}
+
+def normalizar(texto):
+    import unicodedata
+    return unicodedata.normalize("NFKD", texto).encode("ASCII", "ignore").decode("utf-8").strip().lower()
+
+for nome_aba in sheet_names:
+    try:
+        df = xls.parse(nome_aba, header=1)
+        colunas = {normalizar(col): col for col in df.columns}
+
+        col_municipio = colunas.get("municipio")
+        col_cnae = colunas.get("nome do cnae")
+        col_unidades = colunas.get("numero de unidades locais")
+
+        if col_municipio and col_cnae and col_unidades:
+            df_filtrado = df[[col_municipio, col_cnae, col_unidades]].copy()
+            df_filtrado.columns = ["Municipio", "Nome do CNAE", "Número de unidades locais"]
+            sheets_dict[nome_aba] = df_filtrado
+    except Exception as e:
+        print(f"[ERRO] Aba {nome_aba}: {e}")
+
 
 
 
@@ -149,6 +173,7 @@ def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n
         df = df_original.copy()
 
         # Localiza colunas por conteúdo (evita erro com nome exato)
+
         col_municipio = next((col for col in df.columns if "municipio" in col.lower()), None)
         col_cnae = next((col for col in df.columns if "cnae" in col.lower()), None)
         col_unidades = next((col for col in df.columns if "unidade" in col.lower()), None)

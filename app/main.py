@@ -450,13 +450,15 @@ def gerar_prompt(data):
     conversao = consultar_taxa_conversao_openai(segmentos_normalizados)
 
     # 🚫 Previne erro de tipo em comparação matemática
+   
     try:
         conversao = float(conversao)
         if conversao <= 0 or conversao > 1:
-            raise ValueError("Conversão inválida detectada.")
+            raise ValueError("Conversão fora do intervalo aceitável.")
     except Exception as e:
-        logger.warning(f"Conversão inválida detectada: {conversao}. Usando valor padrão 0.2")
+        logger.warning(f"Conversão inválida detectada ({conversao}): {str(e)}. Usando valor padrão 0.2")
         conversao = 0.2
+
 
 
     if not isinstance(conversao, (float, int)) or conversao == 0:
