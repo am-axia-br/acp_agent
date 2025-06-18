@@ -20,6 +20,25 @@
       height: 100vh;
     }
 
+    /* 🟣 Estilo para tabelas do diagnóstico */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
+
+
     .logo {
       display: block;
       margin: 20px auto 10px;
@@ -268,8 +287,16 @@
 
           if (partes.length > 1) {
             cidadesDiv.style.display = 'block';
-            cidadesDiv.innerHTML = `<h4>Diagnóstico Programa de Canais de Vendas</h4><br>${markdownToHtml(partes.slice(1).join("\n\n"))}`;
+
+          const blocos = partes.slice(1).join("\n\n").split("<table");
+          let parteFormatada = markdownToHtml(blocos[0]);
+
+          if (blocos.length > 1) {
+              parteFormatada += "<table" + blocos.slice(1).join("<table");
           }
+
+          cidadesDiv.innerHTML = `<h4>Diagnóstico Programa de Canais de Vendas</h4><br>${parteFormatada}`;
+
 
           emailFinal.textContent = finalData?.email || 'seu e-mail';
           return;

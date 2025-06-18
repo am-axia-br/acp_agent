@@ -518,8 +518,7 @@ def gerar_prompt(data):
 🔹 Serviços Agregados:
 {conhecimento_servicos}
 
-🔹 Cidades com Potencial:
-{cidades_html}
+prompt += f"\n\n🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):\n{cidades_html}\n"
 
 🔹 Retorno sobre o Investimento:
 Ticket Médio: R${ticket:,.2f}
