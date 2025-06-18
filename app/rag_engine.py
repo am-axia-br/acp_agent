@@ -134,133 +134,71 @@ def expandir_termos_por_equivalencia(lista_termos: list[str], base: dict) -> set
 
 
 def extrair_dados_segmentos_cliente_e_canais(segmentos_cliente: list[str], top_n: int = 30):
-    
-    #   Extrai informações das cidades com base nos segmentos informados pelo cliente (Empresa) 
-    #   e nos segmentos fixos definidos para canais de vendas.
-
-    #etorna:
-    #   DataFrame com as colunas:
-    #   - Municipio
-    #   - Empresas_Segmento (segmentos da empresa)
-    #   - Empresas_Perfil_Canal (segmentos fixos de canais)
-
-    dfs_processados = []  # ✅ Adicione aqui antes do for
-
-    excel_file = pd.ExcelFile(arquivo_excel)
-    sheet_names = excel_file.sheet_names
-
-    logger.warning(f"[DEBUG] Abas lidas do Excel: {sheet_names}")
+    dfs_processados = []
+    resultados = {}
 
     termos_cliente = set()
-
     for termo in segmentos_cliente:
         termos_cliente.update(normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae))
 
-    segmentos_canais_input = list(equivalencias_semanticas_canais.keys())
-
     termos_canais = set()
-    
-    for termo in segmentos_canais_input:
-        normalizados = normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae)   
-        termos_canais.update(normalizados)
-    
-    resultados = {}
+    for termo in equivalencias_semanticas_canais.keys():
+        termos_canais.update(normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae))
 
-    for nome_aba in sheet_names:
+    for nome_aba, df_original in sheets_dict.items():
+        df = df_original.copy()
 
-        # Tenta encontrar a linha onde está o cabeçalho correto
+        # Localiza colunas por conteúdo (evita erro com nome exato)
+        col_municipio = next((col for col in df.columns if "municipio" in col.lower()), None)
+        col_cnae = next((col for col in df.columns if "cnae" in col.lower()), None)
+        col_unidades = next((col for col in df.columns if "unidade" in col.lower()), None)
 
-        aba = sheets_dict[nome_aba]
-   
-        df = pd.read_excel(arquivo_excel, sheet_name=nome_aba, skiprows=1)
-
-        try:
-            if "Municipio" not in df.columns:
-                logger.warning(f"[ERRO] Cabeçalho não encontrado corretamente na aba {nome_aba}")
-                continue
-        except Exception as e:
-            logger.error(f"[ERRO] Falha ao ler aba {nome_aba}: {e}")
-            continue
-
-
-        # Verifica se as colunas necessárias estão presentes
-
-        colunas_esperadas = {"Municipio", "Nome do CNAE", "Número de unidades locais"}
-        
-        if not colunas_esperadas.issubset(df.columns):
-            logger.warning(f"[ERRO] Cabeçalho não encontrado na aba {nome_aba}")
-            continue
-
-        df = df[["Municipio", "Nome do CNAE", "Número de unidades locais"]]
-        
-        df = df.rename(columns={"Nome do CNAE": COLUNA_ATIVIDADE, "Número de unidades locais": "Unidades_Locais"})
-
-        df = df[df["Municipio"].notna()]
-        df = df[~df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
-        df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
-        df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
-        df = df[df["Unidades_Locais"].notna()]
-
-        df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
-
-        df["Origem"] = "Excel"
-      
-
-        if not {"Municipio", "Nome do CNAE", "Número de unidades locais"}.issubset(df.columns):
+        if not all([col_municipio, col_cnae, col_unidades]):
             logger.warning(f"[ERRO] Colunas esperadas não encontradas na aba {nome_aba}")
             continue
 
-        df = df[["Municipio", "Nome do CNAE", "Número de unidades locais"]]
-        df = df.rename(columns={"Nome do CNAE": COLUNA_ATIVIDADE, "Número de unidades locais": "Unidades_Locais"})
+        df = df[[col_municipio, col_cnae, col_unidades]]
+        df.columns = ["Municipio", COLUNA_ATIVIDADE, "Unidades_Locais"]
 
         df = df[df["Municipio"].notna()]
         df = df[~df["Municipio"].astype(str).str.contains("Munic|Tabela|Total", na=False)]
         df = df[~df["Unidades_Locais"].astype(str).isin(["-", "nan"])]
         df["Unidades_Locais"] = pd.to_numeric(df["Unidades_Locais"], errors="coerce")
         df = df[df["Unidades_Locais"].notna()]
-
         df[COLUNA_ATIVIDADE] = df[COLUNA_ATIVIDADE].astype(str).str.lower()
+        df["Municipio"] = df["Municipio"].astype(str).str.strip().str.title()
+
+        if df.empty:
+            continue
 
         contagem_segmento = contar_empresas_por_segmento(df, termos_cliente)
         contagem_canal = contar_empresas_por_segmento(df, termos_canais)
 
+        for cidade in set(contagem_segmento.keys()).union(contagem_canal.keys()):
+            if cidade not in resultados:
+                resultados[cidade] = {"Empresas_Segmento": 0, "Empresas_Perfil_Canal": 0}
+            resultados[cidade]["Empresas_Segmento"] += contagem_segmento.get(cidade, 0)
+            resultados[cidade]["Empresas_Perfil_Canal"] += contagem_canal.get(cidade, 0)
+
         dfs_processados.append(df)
 
-
-        if not dfs_processados:
-            logger.error("❌ Nenhum DataFrame válido foi processado. Verifique os dados.")
-            return pd.DataFrame()
-
-
-
-    if not dfs_processados:
-        logger.warning("Nenhuma aba com dados válidos foi processada.")
+    if not resultados:
+        logger.warning("❌ Nenhum dado processado com sucesso.")
         return pd.DataFrame(columns=["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"])
 
-    
-    df_total = pd.concat(dfs_processados, ignore_index=True)
-    df_total["Municipio"] = df_total["Municipio"].astype(str).str.strip().str.title()
-
-    contagem_segmento = contar_empresas_por_segmento(df_total, termos_cliente)
-    contagem_canal = contar_empresas_por_segmento(df_total, termos_canais)
-    
-    
-    for cidade in set(contagem_segmento.keys()).union(contagem_canal.keys()):
-        if cidade not in resultados:
-            resultados[cidade] = {"Empresas_Segmento": 0, "Empresas_Perfil_Canal": 0}
-
-        resultados[cidade]["Empresas_Segmento"] += contagem_segmento.get(cidade, 0)
-        resultados[cidade]["Empresas_Perfil_Canal"] += contagem_canal.get(cidade, 0)
-
     df_final = pd.DataFrame([
-        {"Municipio": k, "Empresas_Segmento": v["Empresas_Segmento"], "Empresas_Perfil_Canal": v["Empresas_Perfil_Canal"]}
-        for k, v in resultados.items()
+        {
+            "Municipio": municipio,
+            "Empresas_Segmento": dados["Empresas_Segmento"],
+            "Empresas_Perfil_Canal": dados["Empresas_Perfil_Canal"]
+        }
+        for municipio, dados in resultados.items()
+    ])
 
-        ])
+    df_final["Empresas_Segmento"] = pd.to_numeric(df_final["Empresas_Segmento"], errors="coerce").fillna(0).astype(int)
+    df_final["Empresas_Perfil_Canal"] = pd.to_numeric(df_final["Empresas_Perfil_Canal"], errors="coerce").fillna(0).astype(int)
 
-    logger.warning(f"[DEBUG] Linhas encontradas: {len(df_final)}")
-    logger.warning(f"[DEBUG] Amostra do DataFrame:\n{df_final.head()}")
-
+    logger.warning(f"[DEBUG] Total de cidades encontradas: {len(df_final)}")
     return df_final.sort_values(by="Empresas_Segmento", ascending=False).head(top_n).reset_index(drop=True)
 
 
