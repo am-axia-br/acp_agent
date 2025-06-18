@@ -258,11 +258,17 @@
           const textoCompleto = finalData.resumo;
           const partes = textoCompleto.split("\n\n");
 
-          resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${partes[0]}</div>`;
+          function markdownToHtml(texto) {
+            return texto
+              .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+              .replace(/\n/g, "<br>");
+          }
+
+          resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${markdownToHtml(partes[0])}</div>`;
 
           if (partes.length > 1) {
             cidadesDiv.style.display = 'block';
-            cidadesDiv.innerHTML = `<h4>Diagnóstico Programa de Canais de Vendas</h4><br>${partes.slice(1).join("<br><br>")}`;
+            cidadesDiv.innerHTML = `<h4>Diagnóstico Programa de Canais de Vendas</h4><br>${markdownToHtml(partes.slice(1).join("\n\n"))}`;
           }
 
           emailFinal.textContent = finalData?.email || 'seu e-mail';

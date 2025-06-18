@@ -543,7 +543,15 @@ def chamar_llm(prompt):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Você é um consultor especialista em canais de vendas. Siga exatamente a estrutura em 13 partes numeradas conforme o prompt, sem pular nenhuma parte."},
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um consultor especialista em canais de vendas. "
+                        "Siga exatamente a estrutura em 13 partes numeradas conforme o prompt. "
+                        "Quando houver tabela HTML (como o bloco de Cidades com Potencial), mantenha o conteúdo original sem reescrever, resumir ou excluir. "
+                        "Seu papel é complementar, não modificar a estrutura do prompt."
+                    )
+                },
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -553,6 +561,7 @@ def chamar_llm(prompt):
     except Exception as e:
         logger.error("Erro na chamada a API OpenAI")
         raise RuntimeError("Erro na chamada a API OpenAI.") from e
+
 
 def sugerir_cidades_openai(segmentos, total_necessario=30):
     try:
