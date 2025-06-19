@@ -3,26 +3,63 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import re
-import pandas as pd
-import os
 import traceback
 import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
 
-import nltk
+import pandas as pd
+import os
 
-# Baixe explicitamente 'punkt' e 'punkt_tab' (isso cobre todos os casos)
+# ====== NLTK seguro para Render ======
+import nltk
+nltk_data_dir = "/tmp/nltk_data"
+os.makedirs(nltk_data_dir, exist_ok=True)
+nltk.data.path.append(nltk_data_dir)
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt')
+    nltk.download('punkt', download_dir=nltk_data_dir)
+# ================================================================
 
-try:
-    nltk.data.find('tokenizers/punkt_tab')
-except LookupError:
-    nltk.download('punkt_tab')
+# ====== INÍCIO: NOVO BLOCO - LangChain RAG para planilhas =======
+
+from langchain.text_splitter import NLTKTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_core.documents import Document
+
+def indexar_planilhas_rag():
+    arquivos = ['Tabela 14.xlsx', 'canais.xlsx']
+    documentos = []
+    for arquivo in arquivos:
+        if os.path.exists(arquivo):
+            df = pd.read_excel(arquivo)
+            for idx, row in df.iterrows():
+                texto = " | ".join([str(x) for x in row.values])
+                documentos.append(
+                    Document(page_content=texto, metadata={"source": arquivo, "linha": idx + 1})
+                )
+            print(f"{arquivo} lido com {df.shape[0]} linhas")
+        else:
+            print(f"Arquivo não encontrado: {arquivo}")
+
+    if not documentos:
+        print("Nenhum documento para indexar!")
+        return None
+
+    splitter = NLTKTextSplitter(chunk_size=5, chunk_overlap=1)
+    chunks = splitter.split_documents(documentos)
+    print(f"Total de chunks: {len(chunks)}")
+    embeddings = OpenAIEmbeddings()
+    db = FAISS.from_documents(chunks, embeddings)
+    print("Indexação RAG concluída!")
+    return db
+
+db_rag = None  # VARIÁVEL GLOBAL para reuso se quiser usar buscas posteriormente
+
+# ====== FIM: NOVO BLOCO LangChain RAG ===========================
 
 import logging
 
@@ -108,8 +145,9 @@ logger.info("Aplicacao FastAPI iniciada")
 
 @app.on_event("startup")
 def indexar_automaticamente():
-    """Indexa automaticamente os documentos do RAG ao iniciar a aplicação."""
+    global db_rag
     try:
+        db_rag = indexar_planilhas_rag()  # NOVO: indexa as planilhas no deploy
         from rag_parcerias import indexar_documentos
         total = indexar_documentos()
         logger.info(f"Indexacao automatica no startup concluida com {total} arquivos.")
@@ -255,8 +293,9 @@ async def resetar_diagnostico():
 
 @app.post("/reindexar-rag")
 async def reindexar_rag():
-    """Reindexa os documentos do RAG manualmente."""
+    global db_rag
     try:
+        db_rag = indexar_planilhas_rag()  # NOVO: reindexa as planilhas manualmente
         from rag_parcerias import indexar_documentos
         total = indexar_documentos()
         logger.info(f"Reindexacao realizada com {total} arquivos")
@@ -268,7 +307,7 @@ async def reindexar_rag():
             "mensagem": str(e),
             "detalhes": traceback.format_exc()
         }
-
+    
 def truncar_texto(texto, limite=500):
     """Trunca um texto se for maior do que o limite definido."""
     return texto[:limite] + "..." if len(texto) > limite else texto
