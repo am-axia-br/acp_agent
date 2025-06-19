@@ -3,7 +3,9 @@ logger = get_logger(__name__)
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
+
 from langchain.text_splitter import NLTKTextSplitter
+
 from pathlib import Path
 import pandas as pd
 import os
@@ -80,7 +82,7 @@ def indexar_documentos():
             ]
 
             # Chunking por frases (3 sentenças por chunk)
-            splitter = NLTKTextSplitter(chunk_size=3)
+            splitter = NLTKTextSplitter(chunk_size=3, chunk_overlap=1)
             chunks = splitter.split_documents(documentos)
 
             embeddings = OpenAIEmbeddings()
