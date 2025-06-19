@@ -3,8 +3,13 @@ import json
 import hashlib
 import pandas as pd
 import numpy as np
+
+import nltk
+
 from difflib import get_close_matches
 from openai import OpenAI
+
+nltk.download('punkt')
 
 from log_config import get_logger
 
