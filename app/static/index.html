@@ -20,7 +20,6 @@
       height: 100vh;
     }
 
-    /* 🟣 Estilo para tabelas do diagnóstico */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -37,7 +36,6 @@
       background-color: #f0f0f0;
       font-weight: bold;
     }
-
 
     .logo {
       display: block;
@@ -61,11 +59,11 @@
       justify-content: center;
       flex-wrap: wrap;
       gap: 10px;
-      max-width: 1100px; /* ajustado */
+      max-width: 1100px;
     }
 
     #mensagem {
-      width: 90%; /* ajustado */
+      width: 90%;
       min-width: 250px;
       padding: 10px;
       border: 1px solid #ccc;
@@ -95,9 +93,9 @@
     }
 
     #mensagens {
-      display: none;
+      display: block; /* Corrigido para sempre mostrar o chat */
       flex: 1;
-      max-width: 1100px; /* ajustado */
+      max-width: 1100px;
       margin: 0 auto;
       background: white;
       padding: 20px;
@@ -107,6 +105,7 @@
       white-space: pre-wrap;
       min-height: 300px;
       max-height: 500px;
+      box-sizing: border-box;
     }
 
     #resposta {
@@ -118,7 +117,7 @@
     .ia { font-style: italic; color: #fc6736; }
 
     #finalizacao {
-      max-width: 1100px; /* ajustado */
+      max-width: 1100px;
       margin: 20px auto;
       background: #fff3cd;
       padding: 20px;
@@ -152,7 +151,7 @@
     }
 
     #cidades {
-      max-width: 1100px; /* ajustado */
+      max-width: 1100px;
       margin: 20px auto;
       background: #e3f2fd;
       padding: 20px;
@@ -224,42 +223,28 @@
   </footer>
 
 <script>
+// Elementos principais
 const mensagens = document.getElementById("mensagens");
 const respostaArea = document.getElementById("resposta");
 const inputMensagem = document.getElementById("mensagem");
+const carregando = document.getElementById("carregando");
+const finalizacao = document.getElementById("finalizacao");
+const cidadesDiv = document.getElementById("cidades");
 
-let carregando = document.createElement("div");
-carregando.id = "carregando";
-carregando.style.display = "none";
-carregando.innerHTML = `
-  <h3 style="text-align:center">⌛ Gerando diagnóstico, aguarde...</h3>
-  <div style="height: 20px; background: #eee; border-radius: 10px; overflow: hidden; margin-top: 10px;">
-    <div id="barra" style="height: 100%; width: 0%; background: linear-gradient(90deg, #a638ec, #fc6736); transition: width 0.3s;"></div>
-  </div>`;
-document.body.appendChild(carregando);
-
-const finalizacao = document.createElement("div");
-finalizacao.id = "finalizacao";
-finalizacao.style.display = "none";
-finalizacao.innerHTML = `<h3 style="text-align:center">✅ Diagnóstico concluído e enviado por e-mail!</h3>`;
-document.body.appendChild(finalizacao);
-
-const cidadesDiv = document.createElement("div");
-cidadesDiv.id = "cidades";
-cidadesDiv.style.display = "none";
-document.body.appendChild(cidadesDiv);
-
+// Fluxo principal do chat
 document.getElementById("chat-form").addEventListener("submit", async function (e) {
   e.preventDefault();
-  const mensagem = inputMensagem.value;
+  const mensagem = inputMensagem.value.trim();
+  if (!mensagem) return;
 
+  // Adiciona a mensagem do usuário
   const divUser = document.createElement("div");
   divUser.className = "mensagem usuario";
   divUser.textContent = "Você: " + mensagem;
   mensagens.appendChild(divUser);
+
+  // Faz scroll sempre após mensagem nova
   mensagens.scrollTop = mensagens.scrollHeight;
-
-
 
   try {
     const response = await fetch("/chat", {
@@ -270,6 +255,7 @@ document.getElementById("chat-form").addEventListener("submit", async function (
 
     const data = await response.json();
 
+    // Só mostra o carregando e parte para diagnóstico se for o final do fluxo
     if (data.loading) {
       mensagens.style.display = 'none';
       carregando.style.display = 'block';
@@ -289,6 +275,7 @@ document.getElementById("chat-form").addEventListener("submit", async function (
       carregando.style.display = 'none';
       finalizacao.style.display = 'block';
 
+      // Processa o resumo do diagnóstico
       const textoCompleto = finalData.resumo;
       const partes = textoCompleto.split("\n\n");
 
@@ -298,10 +285,8 @@ document.getElementById("chat-form").addEventListener("submit", async function (
           .replace(/\n/g, "<br>");
       }
 
-      const resumoDiagnostico = document.createElement("div");
-      resumoDiagnostico.id = "resumoDiagnostico";
+      const resumoDiagnostico = document.getElementById("resumoDiagnostico");
       resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${markdownToHtml(partes[0])}</div>`;
-      document.body.appendChild(resumoDiagnostico);
 
       if (partes.length > 1) {
         cidadesDiv.style.display = 'block';
@@ -316,13 +301,17 @@ document.getElementById("chat-form").addEventListener("submit", async function (
       return;
     }
 
+    // Adiciona a resposta da IA
+    mensagens.style.display = 'block';
     const divIa = document.createElement("div");
     divIa.className = "mensagem ia";
     divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
     mensagens.appendChild(divIa);
+
+    // Scroll automático sempre após nova resposta
     mensagens.scrollTop = mensagens.scrollHeight;
 
-
+    // Para debug
     respostaArea.textContent = JSON.stringify(data, null, 2);
   } catch (error) {
     alert("Erro ao conectar com o servidor.");
@@ -332,16 +321,22 @@ document.getElementById("chat-form").addEventListener("submit", async function (
   inputMensagem.focus();
 });
 
+// Função para reiniciar o chat
 function reiniciarConversa() {
   mensagens.innerHTML = "";
   respostaArea.textContent = "";
-  document.getElementById("chat-form").style.display = 'block';
+  document.getElementById("chat-form").style.display = 'flex';
   mensagens.style.display = 'block';
   document.getElementById("barra").style.width = '0%';
   cidadesDiv.style.display = 'none';
   carregando.style.display = 'none';
   finalizacao.style.display = 'none';
   fetch("/reset", { method: "POST" }).then(() => console.log("Reset backend concluído."));
+}
+
+// Dummy para enviar email (preencha conforme seu backend)
+function enviarEmailFinal() {
+  alert('Função de enviar email ainda não implementada.');
 }
 </script>
 
