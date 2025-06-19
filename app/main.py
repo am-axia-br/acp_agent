@@ -1,16 +1,27 @@
-from fastapi import FastAPI, Request
+import os
+import re
+import json
+import logging
+import traceback
+import pandas as pd
+from fastapi import FastAPI, Request, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import re
-import traceback
-import json
 from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
+# (demais imports do seu projeto)
+from segmento_equivalencias import buscar_segmentos_em_df
 
-import pandas as pd
-import os
+app = FastAPI()
+df_cnae = pd.read_excel("Tabela_CNAE.xlsx")
+
+@app.get("/cnae/segmentos/")
+def get_cnae_por_segmentos(segmentos: str = Query(..., description="Segmentos separados por vírgula")):
+    termos = [s.strip() for s in segmentos.split(",")]
+    df_filtrado = buscar_segmentos_em_df(df_cnae, ["Descrição"], termos)
+    return df_filtrado.to_dict(orient="records")
 
 # ====== NLTK seguro para Render ======
 import nltk
@@ -138,7 +149,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Instância do FastAPI e montagem dos arquivos estáticos
-app = FastAPI()
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logger.info("Aplicacao FastAPI iniciada")

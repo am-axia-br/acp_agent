@@ -4,7 +4,7 @@ import hashlib
 import pandas as pd
 import numpy as np
 
-from equivalencias_segmentos import normalizar_termo_segmento
+from segmento_equivalencias import buscar_segmentos_em_df
 
 from difflib import get_close_matches
 from openai import OpenAI
@@ -267,7 +267,7 @@ def extrair_dados_segmentos_cliente_e_canais(
         termos_canais.update(normalizar_termo_segmento(termo))
     
     # Soma empresas por cidade em todas as abas
-    
+
     for nome_aba, df_original in sheets_dict.items():
         df = df_original.copy()
         col_municipio = next((col for col in df.columns if "municipio" in col.lower()), None)
