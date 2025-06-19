@@ -11,6 +11,11 @@ from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
 
+import nltk
+nltk.download('punkt')
+
+from langchain.text_splitter import NLTKTextSplitter
+
 import logging
 
 STOPWORDS = {
