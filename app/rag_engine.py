@@ -4,6 +4,8 @@ import hashlib
 import pandas as pd
 import numpy as np
 
+from equivalencias_segmentos import normalizar_termo_segmento
+
 from difflib import get_close_matches
 from openai import OpenAI
 
@@ -251,15 +253,21 @@ def extrair_dados_segmentos_cliente_e_canais(
     somando empresas por cidade. Retorna um DataFrame.
     """
     resultados = {}
+    
     # Normaliza segmentos do cliente
+
     termos_cliente = set()
     for termo in segmentos_cliente:
-        termos_cliente.update(normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae))
+        termos_cliente.update(normalizar_termo_segmento(termo))
+    
     # Normaliza segmentos dos canais
+    
     termos_canais = set()
     for termo in equivalencias_semanticas_canais.keys():
-        termos_canais.update(normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae))
+        termos_canais.update(normalizar_termo_segmento(termo))
+    
     # Soma empresas por cidade em todas as abas
+    
     for nome_aba, df_original in sheets_dict.items():
         df = df_original.copy()
         col_municipio = next((col for col in df.columns if "municipio" in col.lower()), None)
