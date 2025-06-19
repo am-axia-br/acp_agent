@@ -257,6 +257,9 @@ document.getElementById("chat-form").addEventListener("submit", async function (
   divUser.className = "mensagem usuario";
   divUser.textContent = "Você: " + mensagem;
   mensagens.appendChild(divUser);
+  mensagens.scrollTop = mensagens.scrollHeight;
+
+
 
   try {
     const response = await fetch("/chat", {
@@ -317,6 +320,8 @@ document.getElementById("chat-form").addEventListener("submit", async function (
     divIa.className = "mensagem ia";
     divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
     mensagens.appendChild(divIa);
+    mensagens.scrollTop = mensagens.scrollHeight;
+
 
     respostaArea.textContent = JSON.stringify(data, null, 2);
   } catch (error) {
