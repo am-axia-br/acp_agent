@@ -1,6 +1,8 @@
 import unicodedata
 from typing import List, Set
 import pandas as pd
+import re
+
 
 # Equivalências semânticas para segmentos comuns no Brasil (indústria, construção, saúde etc.)
 
@@ -253,9 +255,7 @@ for chave in list(EQUIVALENCIAS_SEGMENTOS.keys()):
     if chave_sem_acentos not in EQUIVALENCIAS_SEGMENTOS or not EQUIVALENCIAS_SEGMENTOS[chave_sem_acentos]:
         EQUIVALENCIAS_SEGMENTOS[chave_sem_acentos] = EQUIVALENCIAS_SEGMENTOS[chave]
 
-# Função principal para expandir termos
 
- 
 def normalizar_termo_segmento(termo_usuario: str) -> List[str]:
     """
     Dado um termo (ex: 'industria', 'construção civil', 'saúde', etc), retorna todos equivalentes.
@@ -267,6 +267,10 @@ def normalizar_termo_segmento(termo_usuario: str) -> List[str]:
         return [termo_usuario] + equivalentes
     return [termo_usuario]
 
+
+# Função principal para expandir termos
+
+ 
 def expandir_equivalencias_lista(termos_usuario: List[str]) -> List[str]:
     """
     Dada uma lista de termos do usuário, retorna uma lista expandida de equivalências (sem repetições).
@@ -285,11 +289,16 @@ def buscar_segmentos_em_df(df: pd.DataFrame, colunas_busca: List[str], termos_us
     - termos_usuario: lista de segmentos informados pelo usuário
     Retorna um DataFrame filtrado.
     """
+    
     equivalentes = expandir_equivalencias_lista(termos_usuario)
+    pattern = '|'.join(map(re.escape, equivalentes))
     mask_total = None
     for coluna in colunas_busca:
+        if coluna not in df.columns:
+            print(f"⚠️ Atenção: coluna '{coluna}' não encontrada no DataFrame.")
+            continue
         col_normalizada = df[coluna].astype(str).apply(remover_acentos)
-        mask = col_normalizada.apply(lambda x: any(eq in x for eq in equivalentes))
+        mask = col_normalizada.str.contains(pattern, case=False, na=False)
         mask_total = mask if mask_total is None else (mask_total | mask)
     return df[mask_total] if mask_total is not None else df.iloc[0:0]
 
