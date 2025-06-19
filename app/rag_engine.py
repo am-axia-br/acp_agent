@@ -9,13 +9,16 @@ from openai import OpenAI
 
 import nltk
 
-# Tente baixar apenas se não estiver instalado (evita tentar baixar toda vez)
+# Baixe explicitamente 'punkt' e 'punkt_tab' (isso cobre todos os casos)
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
     nltk.download('punkt')
 
-from langchain.text_splitter import NLTKTextSplitter
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab')
 
 from log_config import get_logger
 
