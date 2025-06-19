@@ -11,9 +11,13 @@ from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
 
-STOPWORDS = {"para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do", "no", "na", "das", "dos"}
-
 import logging
+
+STOPWORDS = {
+    "para", "com", "sem", "de", "e", "ou", "por", "em", "da", "do",
+    "no", "na", "das", "dos"
+}
+
 logger = logging.getLogger(__name__)
 
 from rag_engine import (
@@ -22,18 +26,22 @@ from rag_engine import (
     normalizar_segmentos_inteligente,
     descricoes_cnae,
     embeddings_cnae,
-    buscar_cidades_na_openai
+    buscar_cidades_na_openai,
 )
 
 from rag_parcerias import buscar_conhecimento
 
 def consultar_taxa_conversao_openai(segmentos):
+    """
+    Consulta a taxa de conversão média para o(s) segmento(s) informado(s) usando a OpenAI.
+    """
     try:
-        prompt = f"""Para empresas do segmento {', '.join(segmentos)}, qual é a taxa média de conversão de:
-- Prospecção para oportunidade?
-- Oportunidade para venda?
-Dê um número percentual para cada uma, no Brasil, em mercados B2B."""
-
+        prompt = (
+            f"Para empresas do segmento {', '.join(segmentos)}, qual é a taxa média de conversão de:\n"
+            "- Prospecção para oportunidade?\n"
+            "- Oportunidade para venda?\n"
+            "Dê um número percentual para cada uma, no Brasil, em mercados B2B."
+        )
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -56,10 +64,8 @@ Dê um número percentual para cada uma, no Brasil, em mercados B2B."""
         logger.error(f"Erro ao consultar taxa de conversao: {str(e)}")
         return 0.2 if isinstance(segmentos, list) else 0.2
 
-
-
-# DEFINA A FUNÇÃO ANTES DE USÁ-LA
 def novo_diagnostico():
+    """Gera um novo dicionário de diagnóstico padrão."""
     return {
         "nome": None,
         "empresa": None,
@@ -74,14 +80,14 @@ def novo_diagnostico():
         "resposta_ia": ""
     }
 
-# VARIÁVEL GLOBAL
+# VARIÁVEL GLOBAL DO ESTADO DO DIAGNÓSTICO
 data = novo_diagnostico()
 
-
-
+# Inicialização do ambiente e OpenAI
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Instância do FastAPI e montagem dos arquivos estáticos
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -89,6 +95,7 @@ logger.info("Aplicacao FastAPI iniciada")
 
 @app.on_event("startup")
 def indexar_automaticamente():
+    """Indexa automaticamente os documentos do RAG ao iniciar a aplicação."""
     try:
         from rag_parcerias import indexar_documentos
         total = indexar_documentos()
@@ -96,18 +103,17 @@ def indexar_automaticamente():
     except Exception as e:
         logger.warning(f"Indexacao automatica ignorada: {e}")
 
-
-
 @app.get("/")
 def home():
+    """Endpoint padrão para servir a página inicial e resetar o diagnóstico."""
     global data
     data = novo_diagnostico()
     logger.info("Pagina inicial acessada e dados resetados")
     return FileResponse("static/index.html")
 
 @app.get("/chat")
-
 def chat_get():
+    """Bloqueia acesso GET na rota de chat."""
     return {"erro": "Metodo GET nao permitido nesta rota. Use POST com corpo JSON contendo 'mensagem'."}
 
 class Mensagem(BaseModel):
@@ -128,6 +134,9 @@ perguntas = [
 
 @app.post("/chat")
 async def chat(req: Request):
+    """
+    Endpoint principal do chat. Recebe perguntas e coleta as informações para o diagnóstico.
+    """
     body = await req.json()
     msg = body.get("mensagem", "").strip()
     logger.info(f"Mensagem recebida: {msg}")
@@ -179,7 +188,11 @@ async def chat(req: Request):
         else:
             if len(data["diagnostico"]) < len(perguntas):
                 logger.error("Diagnóstico incompleto. Esperado respostas.")
-                return {"mensagem": "Erro: Respostas incompletas. Por favor, reinicie o diagnóstico.", "resumo": "Erro: respostas insuficientes.", "email": data["email"]}
+                return {
+                    "mensagem": "Erro: Respostas incompletas. Por favor, reinicie o diagnóstico.",
+                    "resumo": "Erro: respostas insuficientes.",
+                    "email": data["email"]
+                }
             try:
                 prompt = gerar_prompt(data)
                 data["prompt"] = prompt
@@ -200,24 +213,36 @@ async def chat(req: Request):
 
 @app.post("/gerar-diagnostico")
 async def gerar_diagnostico():
+    """
+    Endpoint para gerar o diagnóstico final e enviar por e-mail.
+    """
     try:
         resposta = chamar_llm(data["prompt"])
         enviar_email(data, resposta, copia_para=["alexandre.maia@acp.tec.br"])
         logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
-        return {"mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:", "resumo": resposta, "email": data["email"]}
+        return {
+            "mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:",
+            "resumo": resposta,
+            "email": data["email"]
+        }
     except Exception as e:
         logger.error(f"Erro ao gerar diagnostico: {str(e)}")
-        return {"mensagem": "Ocorreu um erro ao gerar o diagnostico.", "resumo": f"Erro ao gerar sugestao: {str(e)}\n\n{traceback.format_exc()}", "email": data["email"]}
+        return {
+            "mensagem": "Ocorreu um erro ao gerar o diagnostico.",
+            "resumo": f"Erro ao gerar sugestao: {str(e)}\n\n{traceback.format_exc()}",
+            "email": data["email"]
+        }
 
 @app.post("/reset")
 async def resetar_diagnostico():
+    """Reseta o estado do diagnóstico global."""
     global data
     data = novo_diagnostico()
     return {"status": "resetado"}
 
-
 @app.post("/reindexar-rag")
 async def reindexar_rag():
+    """Reindexa os documentos do RAG manualmente."""
     try:
         from rag_parcerias import indexar_documentos
         total = indexar_documentos()
@@ -225,13 +250,21 @@ async def reindexar_rag():
         return {"status": "ok", "arquivos_indexados": total}
     except Exception as e:
         logger.error(f"Erro na reindexacao do RAG: {str(e)}")
-        return {"status": "erro", "mensagem": str(e), "detalhes": traceback.format_exc()}
+        return {
+            "status": "erro",
+            "mensagem": str(e),
+            "detalhes": traceback.format_exc()
+        }
 
 def truncar_texto(texto, limite=500):
+    """Trunca um texto se for maior do que o limite definido."""
     return texto[:limite] + "..." if len(texto) > limite else texto
 
 def gerar_prompt(data):
-
+    """
+    Monta o prompt estruturado para análise do diagnóstico e geração do relatório.
+    Inclui o bloco de cidades em HTML no local correto do texto final.
+    """
     origem = data.get("origem", "")
     nome = data["nome"]
     empresa = data["empresa"]
@@ -251,14 +284,12 @@ def gerar_prompt(data):
     ciclo_vendas = respostas[8]
     meta_clientes = respostas[9]
 
-
     if isinstance(segmentos_raw, list):
         segmentos_raw = " ".join(segmentos_raw)
 
     segmento_original = segmentos_raw if len(respostas) > 1 else ""
 
-# ✅ Definir segmentos_lista aqui de forma segura
-
+    # Lista de segmentos limpa
     segmentos_lista = [
         seg.strip().lower()
         for seg in re.split(r"[,\s]+", segmento_original)
@@ -266,7 +297,6 @@ def gerar_prompt(data):
     ]
 
     segmentos_normalizados = []
-    
     for termo in segmentos_lista:
         normalizados = normalizar_segmentos_inteligente(termo, descricoes_cnae, embeddings_cnae)
         segmentos_normalizados.extend(normalizados)
@@ -286,7 +316,7 @@ def gerar_prompt(data):
     try:
         novos_clientes = int(meta_clientes)
         ciclo = int(ciclo_vendas)
-    except:
+    except Exception:
         novos_clientes = 1
         ciclo = 90
 
@@ -303,19 +333,14 @@ def gerar_prompt(data):
         f"Que serviços agregados são relevantes para empresas que vendem {produtos}, com modelo de negócio baseado em {modelo}?"
     )
 
-    # 🔍 CIDADES – RAG + OpenAI até 30, sem fictícias
-
+    # Busca as cidades (RAG + OpenAI para completar 30)
     if isinstance(segmento_original, list):
         segmento_original = " ".join(segmento_original)
-
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
-
-    # Forçar conversão das colunas para número inteiro
 
     for col in ["Empresas_Segmento", "Empresas_Perfil_Canal"]:
         if col in cidades_df.columns:
             cidades_df[col] = pd.to_numeric(cidades_df[col], errors="coerce").fillna(0).astype(int)
-
 
     if cidades_df.empty or any(col not in cidades_df.columns for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]):
         logger.warning("DataFrame de cidades incompleto. Criando estrutura padrão.")
@@ -323,14 +348,10 @@ def gerar_prompt(data):
             "Municipio": ["CidadeDesconhecida"],
             "Empresas_Segmento": [0],
             "Empresas_Perfil_Canal": [0]
-    })
-
-
-    logger.warning(f"[DEBUG] Colunas retornadas: {list(cidades_df.columns)}")
+        })
 
     for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
         if col not in cidades_df.columns:
-            logger.warning(f"Coluna ausente: {col} - preenchendo com valor padrão.")
             cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
 
     try:
@@ -338,104 +359,32 @@ def gerar_prompt(data):
     except Exception as e:
         logger.error(f"[FALHA] Erro ao ordenar DataFrame por 'Empresas_Segmento': {e}")
 
-    logger.warning(f"[DEBUG] Colunas recebidas: {list(cidades_df.columns)}")
-
-    for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
-        if col not in cidades_df.columns:
-            logger.warning(f"Coluna ausente: {col} - criando coluna padrão.")
-            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
-
-    try:
-        cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
-    except Exception as e:
-        logger.error(f"[FALHA] Erro ao ordenar por 'Empresas_Segmento': {e}")
-
-
-    # LOG para debug
-    logger.warning(f"[DEBUG] Colunas do DataFrame retornado: {list(cidades_df.columns)}")
-
-    # Garante que colunas essenciais existam antes de qualquer acesso
-    colunas_necessarias = ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]
-    for col in colunas_necessarias:
-        if col not in cidades_df.columns:
-            logger.warning(f"Coluna ausente: {col}. Criando com valor padrão.")
-            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
-
-    # Ordena com proteção
-    try:
-        cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
-    except Exception as e:
-        logger.error(f"Erro ao ordenar DataFrame por 'Empresas_Segmento': {e}")
-
-    logger.warning(f"[DEBUG] Colunas recebidas do DataFrame: {list(cidades_df.columns)}")
-
-
-    # Previne falhas ao acessar colunas esperadas
-    colunas_obrigatorias = ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]
-    for col in colunas_obrigatorias:
-        if col not in cidades_df.columns:
-            logger.warning(f"Coluna ausente: {col}. Criando com valor padrão.")
-            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
-
-
-    logger.warning(f"Colunas do DataFrame retornado: {list(cidades_df.columns)}")
-
-    # Corrige ausência das colunas obrigatórias
-    for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
-        if col not in cidades_df.columns:
-            logger.warning(f"Coluna ausente detectada: {col}. Adicionando com valor padrão.")
-            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
-
-    logger.warning(f"Colunas do DataFrame retornado: {list(cidades_df.columns)}")
-
-    # Garante colunas obrigatórias para evitar erro ao ordenar
-    
-    for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
-        if col not in cidades_df.columns:
-            logger.warning(f"Coluna ausente detectada: {col}. Adicionando coluna com valor padrão.")
-            cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
-
-    # Agora podemos ordenar com segurança
-
-    try:
-        cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
-    except Exception as e:
-        logger.warning(f"Erro ao ordenar por 'Empresas_Segmento': {e}")
-
-
     if len(cidades_df) < 30:
-
         if cidades_df.empty or "Municipio" not in cidades_df.columns:
-            logger.warning("DataFrame de cidades sem coluna 'Municipio'. Criando estrutura padrão.")
             cidades_df = pd.DataFrame({
                 "Municipio": ["CidadeDesconhecida"],
                 "Empresas_Segmento": [0],
                 "Empresas_Perfil_Canal": [0]
             })
-
         cidades_existentes = cidades_df["Municipio"].tolist()
         faltantes = 30 - len(cidades_df)
         cidades_df_extra = buscar_cidades_na_openai(segmentos_lista, cidades_existentes, faltantes)
-
-        for col in ["Municipio","Empresas_Segmento", "Empresas_Perfil_Canal"]:
+        for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
             if col not in cidades_df_extra.columns:
                 cidades_df_extra[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
-
         cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True)
         cidades_df = cidades_df.drop_duplicates(subset="Municipio").reset_index(drop=True)
-
         faltam = 30 - len(cidades_df)
-
         if faltam > 0:
-            logger.warning(f"Ainda faltam {faltam} cidades. Chamando OpenAI novamente.")
-            cidades_df_extra = buscar_cidades_na_openai(segmentos_lista, cidades_df["Municipio"].tolist(), faltam)
-            cidades_df = pd.concat([cidades_df, cidades_df_extra], ignore_index=True).drop_duplicates(subset="Municipio").reset_index(drop=True)
-
-
+            cidades_df_extra = buscar_cidades_na_openai(
+                segmentos_lista, cidades_df["Municipio"].tolist(), faltam
+            )
+            cidades_df = pd.concat(
+                [cidades_df, cidades_df_extra], ignore_index=True
+            ).drop_duplicates(subset="Municipio").reset_index(drop=True)
         for col in ["Municipio", "Empresas_Segmento", "Empresas_Perfil_Canal"]:
             if col not in cidades_df.columns:
                 cidades_df[col] = 0 if col != "Municipio" else "CidadeDesconhecida"
-
         cidades_df = cidades_df.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
 
     cidades_html = gerar_tabela_html(cidades_df)
@@ -448,9 +397,6 @@ def gerar_prompt(data):
         raise ValueError(f"Erro ao converter valores numericos: {str(e)}") from e
 
     conversao = consultar_taxa_conversao_openai(segmentos_normalizados)
-
-    # 🚫 Previne erro de tipo em comparação matemática
-   
     try:
         conversao = float(conversao)
         if conversao <= 0 or conversao > 1:
@@ -458,8 +404,6 @@ def gerar_prompt(data):
     except Exception as e:
         logger.warning(f"Conversão inválida detectada ({conversao}): {str(e)}. Usando valor padrão 0.2")
         conversao = 0.2
-
-
 
     if not isinstance(conversao, (float, int)) or conversao == 0:
         logger.warning(f"Conversão inválida detectada: {conversao}. Usando valor padrão 0.2")
@@ -471,7 +415,6 @@ def gerar_prompt(data):
     from datetime import datetime, timedelta
     receita_24_meses = 0
     hoje = datetime.today()
-
     for canal_index in range(20):
         dias_ate_primeira_venda = 90 + ciclo + (canal_index * 30)
         data_primeira_venda = hoje + timedelta(days=dias_ate_primeira_venda)
@@ -480,6 +423,7 @@ def gerar_prompt(data):
 
     receita_mensal = ticket * novos_clientes * 20
 
+    # Retorna diagnóstico estruturado com bloco das cidades em HTML incluído
     return f'''
 🧠 DIAGNÓSTICO ESTRUTURADO – EMPRESA {empresa.upper()}
 
@@ -518,7 +462,8 @@ def gerar_prompt(data):
 🔹 Serviços Agregados:
 {conhecimento_servicos}
 
-prompt += f"\n\n🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):\n{cidades_html}\n"
+🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):
+{cidades_html}
 
 🔹 Retorno sobre o Investimento:
 Ticket Médio: R${ticket:,.2f}
@@ -536,8 +481,8 @@ Sua empresa está pronta para crescer com uma estratégia sólida de canais de v
 Entre em contato com a AC Partners e comece agora o onboarding comercial com especialistas.
 '''
 
-
 def chamar_llm(prompt):
+    """Chama a OpenAI para complementar o diagnóstico."""
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -561,10 +506,14 @@ def chamar_llm(prompt):
         logger.error("Erro na chamada a API OpenAI")
         raise RuntimeError("Erro na chamada a API OpenAI.") from e
 
-
+# Funções auxiliares de detalhamento e conhecimento (sem alteração, já estavam bem formatadas)
 def sugerir_cidades_openai(segmentos, total_necessario=30):
     try:
-        prompt = f"Liste {total_necessario} cidades brasileiras com potencial de mercado para empresas que atuam nos segmentos: {', '.join(segmentos)}. Considere demanda, perfil econômico, presença de agronegócio, indústria ou comércio local, dependendo do segmento. Forneça apenas os nomes das cidades, uma por linha."
+        prompt = (
+            f"Liste {total_necessario} cidades brasileiras com potencial de mercado para empresas que atuam nos segmentos: {', '.join(segmentos)}. "
+            "Considere demanda, perfil econômico, presença de agronegócio, indústria ou comércio local, dependendo do segmento. "
+            "Forneça apenas os nomes das cidades, uma por linha."
+        )
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -582,10 +531,11 @@ def sugerir_cidades_openai(segmentos, total_necessario=30):
 
 def detalhar_empresa_openai(site, nome_empresa):
     try:
-        prompt = f"""
-Você é um redator técnico. Com base no nome da empresa "{nome_empresa}" e no site "{site}", gere um resumo claro, profissional e objetivo sobre a empresa. Destaque o segmento de atuação, diferenciais e áreas atendidas.
-Use no máximo 3 frases.
-"""
+        prompt = (
+            f"Você é um redator técnico. Com base no nome da empresa \"{nome_empresa}\" e no site \"{site}\", "
+            "gere um resumo claro, profissional e objetivo sobre a empresa. "
+            "Destaque o segmento de atuação, diferenciais e áreas atendidas. Use no máximo 3 frases."
+        )
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -601,10 +551,10 @@ Use no máximo 3 frases.
 
 def detalhar_produto_openai(produto_texto, segmento):
     try:
-        prompt = f"""
-Explique de forma clara e profissional o seguinte produto ou solução voltado ao segmento {segmento}: "{produto_texto}".
-Gere 2 frases destacando utilidade e valor estratégico para empresas B2B.
-"""
+        prompt = (
+            f"Explique de forma clara e profissional o seguinte produto ou solução voltado ao segmento {segmento}: \"{produto_texto}\". "
+            "Gere 2 frases destacando utilidade e valor estratégico para empresas B2B."
+        )
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -620,11 +570,10 @@ Gere 2 frases destacando utilidade e valor estratégico para empresas B2B.
 
 def detalhar_clientes_openai(clientes_lista):
     try:
-        prompt = f"""
-Gere um parágrafo curto sobre o perfil dos seguintes clientes atendidos atualmente:
-{clientes_lista}
-Mostre diversidade, relevância setorial e valor estratégico.
-"""
+        prompt = (
+            "Gere um parágrafo curto sobre o perfil dos seguintes clientes atendidos atualmente:\n"
+            f"{clientes_lista}\nMostre diversidade, relevância setorial e valor estratégico."
+        )
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -639,16 +588,14 @@ Mostre diversidade, relevância setorial e valor estratégico.
         return clientes_lista
 
 def consultar_taxas_software_b2b():
-    prompt = """
-No mercado brasileiro de software B2B:
-
-1. Qual é a taxa média de conversão de prospecções em oportunidades comerciais?
-2. Qual é a taxa média de conversão de oportunidades em vendas fechadas?
-
-Forneça os dois valores em porcentagem. Exemplo:
-- Prospecção para Oportunidade: 10%
-- Oportunidade para Venda: 20%
-"""
+    prompt = (
+        "No mercado brasileiro de software B2B:\n\n"
+        "1. Qual é a taxa média de conversão de prospecções em oportunidades comerciais?\n"
+        "2. Qual é a taxa média de conversão de oportunidades em vendas fechadas?\n\n"
+        "Forneça os dois valores em porcentagem. Exemplo:\n"
+        "- Prospecção para Oportunidade: 10%\n"
+        "- Oportunidade para Venda: 20%\n"
+    )
     try:
         resposta = client.chat.completions.create(
             model="gpt-4o",
@@ -661,9 +608,7 @@ Forneça os dois valores em porcentagem. Exemplo:
         texto = resposta.choices[0].message.content.strip()
         logger.info(f"Resposta OpenAI sobre conversão: {texto}")
 
-        import re
         matches = re.findall(r"(\d{1,3})%", texto)
-
         if len(matches) >= 2:
             taxa_prospeccao = int(matches[0]) / 100
             taxa_vendas = int(matches[1]) / 100
@@ -676,17 +621,18 @@ Forneça os dois valores em porcentagem. Exemplo:
         return 0.1, 0.2
 
 def buscar_conhecimento_complementado(pergunta: str) -> str:
-    """Consulta o RAG e complementa com a OpenAI para respostas mais completas"""
+    """
+    Consulta o RAG e complementa com a OpenAI para respostas mais completas.
+    Garante resposta robusta para perguntas-chave do diagnóstico.
+    """
     try:
         resposta_rag = buscar_conhecimento(pergunta, k=3)
-
-        prompt = f"""Você é um consultor de canais de vendas B2B. Responda à pergunta abaixo de forma clara, objetiva e baseada em boas práticas e exemplos do mercado brasileiro.
-
-Pergunta: {pergunta}
-
-A resposta deve ser complementar a este conteúdo já obtido:
-{resposta_rag}
-"""
+        prompt = (
+            "Você é um consultor de canais de vendas B2B. Responda à pergunta abaixo de forma clara, objetiva "
+            "e baseada em boas práticas e exemplos do mercado brasileiro.\n\n"
+            f"Pergunta: {pergunta}\n\n"
+            f"A resposta deve ser complementar a este conteúdo já obtido:\n{resposta_rag}\n"
+        )
         resposta_openai = client.chat.completions.create(
             model="gpt-4o",
             messages=[
