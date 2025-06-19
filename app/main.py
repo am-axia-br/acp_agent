@@ -12,7 +12,12 @@ from mail import enviar_email
 from openai import OpenAI
 
 import nltk
-nltk.download('punkt')
+
+# Tente baixar apenas se não estiver instalado (evita tentar baixar toda vez)
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 from langchain.text_splitter import NLTKTextSplitter
 
