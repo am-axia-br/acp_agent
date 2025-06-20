@@ -334,6 +334,9 @@ def gerar_prompt(data):
     empresa = data["empresa"]
     respostas = data["diagnostico"]
 
+
+
+
     if len(respostas) < 2:
         raise ValueError("Respostas insuficientes para gerar o prompt.")
 
@@ -398,9 +401,16 @@ def gerar_prompt(data):
     )
 
     # Busca as cidades (RAG + OpenAI para completar 30)
+    
     if isinstance(segmento_original, list):
         segmento_original = " ".join(segmento_original)
     cidades_df = filtrar_municipios_por_segmento(segmento_original, top_n=30)
+
+
+    print("==== DEBUG cidades_df ====")
+    print(cidades_df.head(10))
+    print("==== FIM DEBUG cidades_df ====")
+
 
     for col in ["Empresas_Segmento", "Empresas_Perfil_Canal"]:
         if col in cidades_df.columns:
