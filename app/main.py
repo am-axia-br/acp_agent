@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from mail import enviar_email
 from openai import OpenAI
 # (demais imports do seu projeto)
-from segmento_equivalencias import buscar_segmentos_em_df
+from segmento_equivalencias import *
 
 app = FastAPI()
 df_cnae = pd.read_excel("Tabela_CNAE.xlsx")
