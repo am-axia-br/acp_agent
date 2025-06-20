@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import logging
 import traceback
 import pandas as pd
@@ -13,6 +12,8 @@ from mail import enviar_email
 from openai import OpenAI
 # (demais imports do seu projeto)
 from segmento_equivalencias import *
+
+from segmento_equivalencias import buscar_segmentos_em_df
 
 app = FastAPI()
 df_cnae = pd.read_excel("Tabela_CNAE.xlsx")

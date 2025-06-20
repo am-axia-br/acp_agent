@@ -4,7 +4,8 @@ import hashlib
 import pandas as pd
 import numpy as np
 
-from segmento_equivalencias import buscar_segmentos_em_df
+
+from segmento_equivalencias import normalizar_termo_segmento
 
 from difflib import get_close_matches
 from openai import OpenAI
