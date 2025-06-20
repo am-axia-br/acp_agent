@@ -12,6 +12,8 @@ import os
 import time
 import threading
 
+from segmento_equivalencias import *
+
 # Configurações globais
 ARQUIVO_EXCEL = "canais.xlsx"
 INDEX_DIR = "vectorstore_canais/"
