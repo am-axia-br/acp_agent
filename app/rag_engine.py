@@ -180,10 +180,13 @@ def normalizar_segmentos_inteligente(
     return [termo_usuario]
 
 def cnae_bate_com_qualquer_termo(cnae: str, termos: set[str]) -> bool:
-    """Verifica se algum dos termos está presente no CNAE (tokenizado)."""
-    import re
-    tokens = set(re.findall(r"\w+", cnae.lower()))
-    return any(t in tokens for t in termos)
+    """
+    Retorna True se qualquer termo (normalizado) aparecer como substring na descrição CNAE (também normalizada).
+    """
+    cnae_norm = normalizar(cnae)
+    # Garante que todos os termos estão normalizados
+    termos_norm = set(normalizar(t) for t in termos)
+    return any(t in cnae_norm for t in termos_norm)
 
 def contar_empresas_por_segmento(df: pd.DataFrame, termos: set[str]) -> dict[str, int]:
     """Conta o número de empresas por segmento em cada município."""

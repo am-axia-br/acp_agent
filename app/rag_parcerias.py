@@ -198,3 +198,17 @@ if __name__ == "__main__":
     for pergunta in exemplos_perguntas():
         resultado = buscar_conhecimento_complementado(pergunta)
         print(f"\n📌 PERGUNTA: {pergunta}\nRESPOSTA:\n{resultado}\n")
+
+def carregar_dados_df():
+    """
+    Carrega todos os dados das abas do Excel (canais.xlsx) em um único DataFrame,
+    adicionando uma coluna 'Aba' para origem.
+    """
+    df_dict = pd.read_excel(ARQUIVO_EXCEL, sheet_name=None)
+    dfs = []
+    for aba, df in df_dict.items():
+        if not df.empty:
+            df['Aba'] = aba
+            dfs.append(df)
+    df_total = pd.concat(dfs, ignore_index=True)
+    return df_total

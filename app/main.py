@@ -16,7 +16,7 @@ from segmento_equivalencias import *
 from segmento_equivalencias import buscar_segmentos_em_df
 
 app = FastAPI()
-df_cnae = pd.read_excel("Tabela_CNAE.xlsx")
+df_cnae = pd.read_excel("Tabela 14.xlsx")
 
 @app.get("/cnae/segmentos/")
 def get_cnae_por_segmentos(segmentos: str = Query(..., description="Segmentos separados por vírgula")):

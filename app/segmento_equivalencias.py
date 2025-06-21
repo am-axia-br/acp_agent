@@ -281,6 +281,59 @@ def expandir_equivalencias_lista(termos_usuario: List[str]) -> List[str]:
         resultado.update([remover_acentos(t.strip()) for t in equivalentes])
     return list(resultado)
 
+def get_equivalentes_segmento_cliente(segmentos_cliente):
+    return expandir_equivalencias_lista(segmentos_cliente)
+
+def contar_empresas_por_segmento(df, col_segmento, col_cidade, termos_segmento):
+    """
+    Conta empresas por cidade para os termos de segmento informados.
+    """
+    df_filtrado = buscar_segmentos_em_df(df, [col_segmento], termos_segmento)
+    return df_filtrado[col_cidade].value_counts()
+
+def top_n_cidades(series_cidade, n=30):
+    return series_cidade.head(n).index.tolist()
+
+def get_equivalentes_ti():
+    return expandir_equivalencias_lista(["tecnologia", "ti"])
+
+def contar_empresas_tecnologia_nessas_cidades(df, col_segmento, col_cidade, cidades_top30):
+    termos_ti = get_equivalentes_ti()
+    df_ti = buscar_segmentos_em_df(df, [col_segmento], termos_ti)
+    filtro_cidades = df_ti[col_cidade].isin(cidades_top30)
+    return df_ti[filtro_cidades][col_cidade].value_counts()
+
+def gerar_tabela_clientes_tecnologia():
+    df = carregar_dados_df()
+    col_segmento = "Nome do CNAE"  # ou o nome correto da coluna de segmento
+    col_cidade = "Município"       # ou o nome correto da coluna de cidade
+
+    # 1. Segmentos do cliente (exemplo: pode vir de input, aqui fixo)
+    segmentos_cliente = ["agronegócio", "comércio"]
+
+    # 2. Equivalentes do cliente
+    termos_cliente = get_equivalentes_segmento_cliente(segmentos_cliente)
+
+    # 3. Conta empresas por cidade
+    series_cidade = contar_empresas_por_segmento(df, col_segmento, col_cidade, termos_cliente)
+
+    # 4. Top 30 cidades
+    cidades_top30 = top_n_cidades(series_cidade, 30)
+
+    # 5. Conta empresas de TI/tecnologia nessas cidades
+    series_ti = contar_empresas_tecnologia_nessas_cidades(df, col_segmento, col_cidade, cidades_top30)
+
+    # 6. Gera tabela final
+    result = []
+    for cidade in cidades_top30:
+        total_cliente = series_cidade.get(cidade, 0)
+        total_ti = series_ti.get(cidade, 0)
+        result.append({"Cidade": cidade, "Empresas Segmento Cliente": total_cliente, "Empresas Tecnologia/TI": total_ti})
+    df_result = pd.DataFrame(result)
+    return df_result
+
+
+
 def buscar_segmentos_em_df(df: pd.DataFrame, colunas_busca: List[str], termos_usuario: List[str]) -> pd.DataFrame:
     """
     Busca linhas no DataFrame onde qualquer equivalente dos segmentos do usuário aparece nas colunas indicadas.
@@ -310,6 +363,21 @@ if __name__ == "__main__":
     print("Equivalências expandidas:", todos_equivalentes)
 
     # Exemplo de uso em DataFrame:
-    df = pd.read_excel("Tabela_CNAE.xlsx")
+    df = pd.read_excel("Tabela 14.xlsx")
     filtrado = buscar_segmentos_em_df(df, ["Descrição"], termos)
     print(filtrado)
+
+def carregar_dados_df():
+    """
+    Carrega todos os dados das abas do Excel (Tabela_CNAE.xlsx) em um único DataFrame,
+    adicionando uma coluna 'Aba' para origem.
+    """
+    df_dict = pd.read_excel("Tabela 14.xlsx", sheet_name=None)
+    dfs = []
+    for aba, df in df_dict.items():
+        if not df.empty:
+            df['Aba'] = aba
+            dfs.append(df)
+    df_total = pd.concat(dfs, ignore_index=True)
+    return df_total
+
