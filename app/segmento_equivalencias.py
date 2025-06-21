@@ -2,6 +2,9 @@ import unicodedata
 from typing import List, Set
 import pandas as pd
 import re
+from rapidfuzz import fuzz
+from openai import OpenAI
+import numpy as np
 
 
 # Equivalências semânticas para segmentos comuns no Brasil (indústria, construção, saúde etc.)
@@ -288,7 +291,14 @@ def contar_empresas_por_segmento(df, col_segmento, col_cidade, termos_segmento):
     """
     Conta empresas por cidade para os termos de segmento informados.
     """
-    df_filtrado = buscar_segmentos_em_df(df, [col_segmento], termos_segmento)
+    df_filtrado = buscar_segmentos_em_df_avancado(
+        df, colunas, termos,
+        embeddings_cnae=embeddings_cnae,
+        descricoes_cnae=descricoes_cnae,
+        fuzzy_threshold=85,
+        emb_threshold=0.7,
+        use_embeddings=True
+    )    
     return df_filtrado[col_cidade].value_counts()
 
 def top_n_cidades(series_cidade, n=30):
@@ -381,3 +391,71 @@ def carregar_dados_df():
     df_total = pd.concat(dfs, ignore_index=True)
     return df_total
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+def get_embedding(text):
+    try:
+        response = client.embeddings.create(
+            input=[text], model="text-embedding-3-small"
+        )
+        return response.data[0].embedding
+    except Exception as e:
+        print(f"Erro ao gerar embedding: {e}")
+        return None
+
+def cosine_similarity(v1, v2):
+    v1 = np.array(v1)
+    v2 = np.array(v2)
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+def segmento_match(texto, equivalentes, threshold_fuzzy=85, threshold_emb=0.7, embeddings_cnae=None, descricoes_cnae=None, use_embeddings=False):
+    texto_norm = remover_acentos(texto.lower())
+    for termo in equivalentes:
+        if termo in texto_norm:
+            return True
+        if fuzz.partial_ratio(termo, texto_norm) >= threshold_fuzzy:
+            return True
+    # Embedding matching (fora do loop dos equivalentes)
+    if use_embeddings and embeddings_cnae is not None and descricoes_cnae is not None:
+        emb_text = get_embedding(texto)
+        if emb_text is not None:
+            for emb in embeddings_cnae:
+                if cosine_similarity(emb_text, emb) > threshold_emb:
+                    return True
+    return False
+
+def buscar_segmentos_em_df_avancado(
+    df: pd.DataFrame,
+    colunas_busca: List[str],
+    termos_usuario: List[str],
+    embeddings_cnae=None,
+    descricoes_cnae=None,
+    fuzzy_threshold=85,
+    emb_threshold=0.7,
+    use_embeddings=False
+) -> pd.DataFrame:
+    """
+    Busca linhas no DataFrame onde qualquer equivalente dos segmentos do usuário aparece nas colunas indicadas.
+    Usa substring, fuzzy e embeddings!
+    """
+    equivalentes = [remover_acentos(t) for t in expandir_equivalencias_lista(termos_usuario)]
+    mask_total = None
+    for coluna in colunas_busca:
+        if coluna not in df.columns:
+            print(f"⚠️ Atenção: coluna '{coluna}' não encontrada no DataFrame.")
+            continue
+        col_normalizada = df[coluna].astype(str)
+        mask = col_normalizada.apply(
+            lambda text: segmento_match(
+                text,
+                equivalentes,
+                threshold_fuzzy=fuzzy_threshold,
+                threshold_emb=emb_threshold,
+                embeddings_cnae=embeddings_cnae,
+                descricoes_cnae=descricoes_cnae,
+                use_embeddings=use_embeddings
+            )
+        )
+        mask_total = mask if mask_total is None else (mask_total | mask)
+    return df[mask_total] if mask_total is not None else df.iloc[0:0]

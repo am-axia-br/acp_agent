@@ -312,6 +312,13 @@ def extrair_dados_segmentos_cliente_e_canais(
     df_final["Empresas_Segmento"] = pd.to_numeric(df_final["Empresas_Segmento"], errors="coerce").fillna(0).astype(int)
     df_final["Empresas_Perfil_Canal"] = pd.to_numeric(df_final["Empresas_Perfil_Canal"], errors="coerce").fillna(0).astype(int)
     df_final = df_final.sort_values(by="Empresas_Segmento", ascending=False).reset_index(drop=True)
+
+    logger.info(f"DEBUG termos_cliente: {termos_cliente}")
+    logger.info(f"DEBUG termos_canais: {termos_canais}")
+    for nome_aba, df_original in sheets_dict.items():
+        logger.info(f"DEBUG primeira linha da aba {nome_aba}: {df_original.head(1)}")
+
+
     return df_final.head(top_n)
 
 def filtrar_municipios_por_segmentos_multiplos(segmentos_textuais: str, top_n: int = 30) -> pd.DataFrame:

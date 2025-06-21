@@ -13,7 +13,8 @@ from openai import OpenAI
 # (demais imports do seu projeto)
 from segmento_equivalencias import *
 
-from segmento_equivalencias import buscar_segmentos_em_df
+from segmento_equivalencias import buscar_segmentos_em_df_avancado, descricoes_cnae, embeddings_cnae
+
 
 app = FastAPI()
 df_cnae = pd.read_excel("Tabela 14.xlsx")
@@ -21,7 +22,16 @@ df_cnae = pd.read_excel("Tabela 14.xlsx")
 @app.get("/cnae/segmentos/")
 def get_cnae_por_segmentos(segmentos: str = Query(..., description="Segmentos separados por vírgula")):
     termos = [s.strip() for s in segmentos.split(",")]
-    df_filtrado = buscar_segmentos_em_df(df_cnae, ["Descrição"], termos)
+    df_filtrado = buscar_segmentos_em_df_avancado(
+        df_cnae,
+        ["Descrição"],
+        termos,
+        embeddings_cnae=embeddings_cnae,
+        descricoes_cnae=descricoes_cnae,
+        fuzzy_threshold=85,
+        emb_threshold=0.7,
+        use_embeddings=True
+    )
     return df_filtrado.to_dict(orient="records")
 
 # ====== NLTK seguro para Render ======
