@@ -384,9 +384,9 @@ def gerar_prompt(data):
     produtos = truncar_texto(produtos)
     modelo = truncar_texto(modelo_negocio)
 
-    resumo_empresa = detalhar_empresa_openai(site, empresa, segmentos, clientes, produtos, modelo_negocio)    
+    resumo_empresa = detalhar_empresa_openai(site, empresa, segmento, clientes, produtos, modelo)    
     resumo_produto = detalhar_produto_openai(produtos, segmento)
-    resumo_clientes = detalhar_clientes_openai(clientes, ticket_medio, segmentos, produtos, modelo_negocio)
+    resumo_clientes = detalhar_clientes_openai(clientes, ticket_medio_str, segmento, produtos, modelo)
     taxa_pros, taxa_vendas = consultar_taxas_software_b2b()
 
     try:
@@ -403,10 +403,10 @@ def gerar_prompt(data):
         nome_empresa=empresa,
         site=site,
         clientes=clientes,
-        ticket_medio=ticket_medio,
+        ticket_medio=ticket_medio_str,
         ciclo_vendas=ciclo_vendas,
         produto=produtos,
-        segmentos=segmentos,
+        segmentos=segmento,
         modelo_negocio=modelo_negocio,
         k=5
     )
@@ -415,10 +415,10 @@ def gerar_prompt(data):
         nome_empresa=empresa,
         site=site,
         clientes=clientes,
-        ticket_medio=ticket_medio,
+        ticket_medio=ticket_medio_str,
         ciclo_vendas=ciclo_vendas,
         produto=produtos,
-        segmentos=segmentos,
+        segmentos=segmento,
         modelo_negocio=modelo_negocio,
         k=5
     )
@@ -428,23 +428,23 @@ def gerar_prompt(data):
         nome_empresa=empresa,
         site=site,
         clientes=clientes,
-        ticket_medio=ticket_medio,
+        ticket_medio=ticket_medio_str,
         ciclo_vendas=ciclo_vendas,
         produto=produtos,
-        segmentos=segmentos,
+        segmentos=segmento,
         modelo_negocio=modelo_negocio,
         dores=dores,
-        beneficios=beneficios,
+        beneficios=diferenciais,
         diferenciais=diferenciais,
         k=10
     )
 
     dicas_estrategicas = gerar_dicas_estrategicas(
         site=site,
-        segmentos=segmentos,
+        segmentos=segmento,
         clientes=clientes,
         dores=dores,
-        beneficios=beneficios,
+        beneficios=diferenciais,
         diferenciais=diferenciais,
         produtos=produtos,
         modelo_negocio=modelo_negocio,
