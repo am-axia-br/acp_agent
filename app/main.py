@@ -280,12 +280,19 @@ async def gerar_diagnostico():
     Endpoint para gerar o diagnóstico final e enviar por e-mail.
     """
     try:
-        resposta = chamar_llm(data["prompt"])
-        enviar_email(data, resposta, copia_para=["alexandre.maia@acp.tec.br"])
+        # Agora, gerar_prompt retorna dois valores:
+        prompt_sem_cidades_html, cidades_html = gerar_prompt(data)
+        texto_diagnostico = chamar_llm(prompt_sem_cidades_html)
+        diagnostico_final = (
+            texto_diagnostico +
+            "\n\n🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):\n" +
+            cidades_html
+        )
+        enviar_email(data, diagnostico_final, copia_para=["alexandre.maia@acp.tec.br"])
         logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
         return {
             "mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:",
-            "resumo": resposta,
+            "resumo": diagnostico_final,
             "email": data["email"]
         }
     except Exception as e:
@@ -463,6 +470,10 @@ def gerar_prompt(data):
 
     cidades_html = gerar_tabela_html(cidades_df)
 
+    print("==== DEBUG cidades_html ====")
+    print(cidades_html)
+    print("==== FIM DEBUG cidades_html ====")
+
     try:
         ticket = float(ticket_medio_str)
         ciclo = int(ciclo_vendas)
@@ -498,7 +509,9 @@ def gerar_prompt(data):
     receita_mensal = ticket * novos_clientes * 20
 
     # Retorna diagnóstico estruturado com bloco das cidades em HTML incluído
-    return f'''
+
+
+    prompt_sem_cidades_html = f'''
 🧠 DIAGNÓSTICO ESTRUTURADO – EMPRESA {empresa.upper()}
 
 🔹 Local informado:
@@ -536,9 +549,6 @@ def gerar_prompt(data):
 🔹 Serviços Agregados:
 {conhecimento_servicos}
 
-🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):
-{cidades_html}
-
 🔹 Retorno sobre o Investimento:
 Ticket Médio: R${ticket:,.2f}
 Receita Mensal com 20 canais: R${receita_mensal:,.2f}
@@ -554,6 +564,9 @@ Receita estimada em 24 meses: R${receita_24_meses:,.2f}
 Sua empresa está pronta para crescer com uma estratégia sólida de canais de vendas.
 Entre em contato com a AC Partners e comece agora o onboarding comercial com especialistas.
 '''
+
+    # RETORNE O PROMPT E O HTML DAS CIDADES SEPARADOS!
+    return prompt_sem_cidades_html, cidades_html
 
 def chamar_llm(prompt):
     """Chama a OpenAI para complementar o diagnóstico."""
