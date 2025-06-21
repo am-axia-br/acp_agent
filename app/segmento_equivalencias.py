@@ -7,8 +7,14 @@ from openai import OpenAI
 import numpy as np
 import os
 
-
-# Equivalências semânticas para segmentos comuns no Brasil (indústria, construção, saúde etc.)
+try:
+    df_cnae = pd.read_excel("Tabela 14.xlsx")
+    descricoes_cnae = df_cnae["Nome do CNAE"].tolist()
+    # Aqui, embeddings_cnae pode ser carregado de um arquivo .npy, .csv, etc.
+    embeddings_cnae = []  # Coloque aqui o carregamento real dos embeddings, se houver
+except Exception as e:
+    descricoes_cnae = []
+    embeddings_cnae = []
 
 
 
@@ -293,7 +299,7 @@ def contar_empresas_por_segmento(df, col_segmento, col_cidade, termos_segmento):
     Conta empresas por cidade para os termos de segmento informados.
     """
     df_filtrado = buscar_segmentos_em_df_avancado(
-        df, colunas, termos,
+        df, [col_segmento], termos_segmento,  # <--- corrigido (lista!)
         embeddings_cnae=embeddings_cnae,
         descricoes_cnae=descricoes_cnae,
         fuzzy_threshold=85,
@@ -314,13 +320,15 @@ def contar_empresas_tecnologia_nessas_cidades(df, col_segmento, col_cidade, cida
     filtro_cidades = df_ti[col_cidade].isin(cidades_top30)
     return df_ti[filtro_cidades][col_cidade].value_counts()
 
-def gerar_tabela_clientes_tecnologia():
+def gerar_tabela_clientes_tecnologia(respostas):
     df = carregar_dados_df()
-    col_segmento = "Nome do CNAE"  # ou o nome correto da coluna de segmento
-    col_cidade = "Município"       # ou o nome correto da coluna de cidade
+    col_segmento = "Nome do CNAE"
+    col_cidade = "Município"
 
-    # 1. Segmentos do cliente (exemplo: pode vir de input, aqui fixo)
-    segmentos_cliente = ["agronegócio", "comércio"]
+    # 1. Segmentos do cliente (vem da resposta do questionário)
+    segmentos_raw = respostas.get("Quais segmentos a empresa atende?", "")
+    # Transforma em lista, separando por vírgula, tira os espaços, ignora vazios
+    segmentos_cliente = [seg.strip() for seg in segmentos_raw.split(",") if seg.strip()]
 
     # 2. Equivalentes do cliente
     termos_cliente = get_equivalentes_segmento_cliente(segmentos_cliente)
@@ -339,7 +347,11 @@ def gerar_tabela_clientes_tecnologia():
     for cidade in cidades_top30:
         total_cliente = series_cidade.get(cidade, 0)
         total_ti = series_ti.get(cidade, 0)
-        result.append({"Cidade": cidade, "Empresas Segmento Cliente": total_cliente, "Empresas Tecnologia/TI": total_ti})
+        result.append({
+            "Cidade": cidade,
+            "Empresas Segmento Cliente": total_cliente,
+            "Empresas Tecnologia/TI": total_ti
+        })
     df_result = pd.DataFrame(result)
     return df_result
 
@@ -375,7 +387,7 @@ if __name__ == "__main__":
 
     # Exemplo de uso em DataFrame:
     df = pd.read_excel("Tabela 14.xlsx")
-    filtrado = buscar_segmentos_em_df(df, ["Descrição"], termos)
+    filtrado = buscar_segmentos_em_df(df, ["Nome do CNAE"], termos)
     print(filtrado)
 
 def carregar_dados_df():
