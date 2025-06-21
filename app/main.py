@@ -290,7 +290,8 @@ async def gerar_diagnostico():
     try:
         diagnostico, cidades_html = gerar_prompt(data)  # <- agora retorna dois campos!
 
-        enviar_email(data, f"{diagnostico}\n\n{cidades_html}", copia_para=["alexandre.maia@acp.tec.br"])
+        # enviar_email(data, f"{diagnostico}\n\n{cidades_html}", copia_para=["alexandre.maia@acp.tec.br"])
+        
         logger.info("Diagnostico gerado com sucesso e e-mail enviado")
         return {
             "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
@@ -305,6 +306,27 @@ async def gerar_diagnostico():
             "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
             "email": data["email"]
         }
+
+@app.post("/enviar-email-final")
+async def enviar_email_final(req: Request):
+    body = await req.json()
+    email = body.get("email")
+    diagnostico = body.get("diagnostico")
+    cidades_html = body.get("cidades_html")
+
+    corpo_email = f"""
+    <h2>Resumo do Diagnóstico</h2>
+    {diagnostico}
+    <h2>Ranking de Cidades com Potencial</h2>
+    {cidades_html}
+    """
+
+    try:
+        # Ajuste conforme sua função real de envio de e-mail
+        enviar_email({"email": email}, corpo_email, copia_para=["alexandre.maia@acp.tec.br"])
+        return {"status": "ok", "mensagem": "Diagnóstico enviado com sucesso!"}
+    except Exception as e:
+        return {"status": "erro", "mensagem": f"Erro ao enviar e-mail: {str(e)}"}
 
 @app.post("/reset")
 async def resetar_diagnostico():
