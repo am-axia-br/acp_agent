@@ -290,8 +290,8 @@ async def gerar_diagnostico():
     try:
         diagnostico, cidades_html = gerar_prompt(data)  # <- agora retorna dois campos!
 
-        # enviar_email(data, f"{diagnostico}\n\n{cidades_html}", copia_para=["alexandre.maia@acp.tec.br"])
-        
+        #enviar_email(data, f"{diagnostico}\n\n{cidades_html}", copia_para=["alexandre.maia@acp.tec.br"])
+
         logger.info("Diagnostico gerado com sucesso e e-mail enviado")
         return {
             "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
