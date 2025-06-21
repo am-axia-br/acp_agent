@@ -287,33 +287,22 @@ async def chat(req: Request):
 
 @app.post("/gerar-diagnostico")
 async def gerar_diagnostico():
-    """
-    Endpoint para gerar o diagnóstico final e enviar por e-mail.
-    """
     try:
-        # Agora, gerar_prompt retorna dois valores, mas vamos ignorar cidades_html
-        prompt_sem_cidades_html, cidades_html = gerar_prompt(data)
-        texto_diagnostico = chamar_llm(prompt_sem_cidades_html)
-        
-        # NÃO concatena cidades_html e NÃO adiciona o título!
-        
-        diagnostico_final = texto_diagnostico + "\n\n" + cidades_html
+        diagnostico, cidades_html = gerar_prompt(data)  # <- agora retorna dois campos!
 
-        diagnostico_final_limpo = limpar_tabela_fake(diagnostico_final)
-        diagnostico_formatado = titulos_html_sem_hash(diagnostico_final_limpo)
-
-        enviar_email(data, diagnostico_formatado, copia_para=["alexandre.maia@acp.tec.br"])
-        logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
+        enviar_email(data, f"{diagnostico}\n\n{cidades_html}", copia_para=["alexandre.maia@acp.tec.br"])
+        logger.info("Diagnostico gerado com sucesso e e-mail enviado")
         return {
-            "mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:",
-            "resumo": diagnostico_formatado,
+            "mensagem": "Diagnóstico finalizado! Aqui está nossa análise baseada nas suas respostas:",
+            "diagnostico": diagnostico,
+            "cidades_html": cidades_html,
             "email": data["email"]
         }
     except Exception as e:
         logger.error(f"Erro ao gerar diagnostico: {str(e)}")
         return {
-            "mensagem": "Ocorreu um erro ao gerar o diagnostico.",
-            "resumo": f"Erro ao gerar sugestao: {str(e)}\n\n{traceback.format_exc()}",
+            "mensagem": "Ocorreu um erro ao gerar o diagnóstico.",
+            "resumo": f"Erro ao gerar sugestão: {str(e)}\n\n{traceback.format_exc()}",
             "email": data["email"]
         }
 
@@ -395,10 +384,9 @@ def gerar_prompt(data):
     produtos = truncar_texto(produtos)
     modelo = truncar_texto(modelo_negocio)
 
-    resumo_empresa = detalhar_empresa_openai(site, empresa)
+    resumo_empresa = detalhar_empresa_openai(site, empresa, segmentos, clientes, produtos, modelo_negocio)    
     resumo_produto = detalhar_produto_openai(produtos, segmento)
-    resumo_clientes = detalhar_clientes_openai(clientes)
-
+    resumo_clientes = detalhar_clientes_openai(clientes, ticket_medio, segmentos, produtos, modelo_negocio)
     taxa_pros, taxa_vendas = consultar_taxas_software_b2b()
 
     try:
@@ -411,14 +399,61 @@ def gerar_prompt(data):
     oportunidades = int(novos_clientes / taxa_vendas)
     prospeccoes = int(oportunidades / taxa_pros)
 
-    conhecimento_modelos = buscar_conhecimento_complementado(
-        f"Quais modelos de parceria são ideais para empresas como a {empresa}, que atuam com {produtos} no segmento {segmento}?"
+    conhecimento_modelos = buscar_modelos_parceria_empresa(
+        nome_empresa=empresa,
+        site=site,
+        clientes=clientes,
+        ticket_medio=ticket_medio,
+        ciclo_vendas=ciclo_vendas,
+        produto=produtos,
+        segmentos=segmentos,
+        modelo_negocio=modelo_negocio,
+        k=5
     )
-    conhecimento_perfis = buscar_conhecimento_complementado(
-        f"Quais os perfis de empresas parceiras ideais para {empresa}, considerando que seus clientes são como: {clientes}?"
+    
+    perfis_e_modelos = conhecimento_perfis(
+        nome_empresa=empresa,
+        site=site,
+        clientes=clientes,
+        ticket_medio=ticket_medio,
+        ciclo_vendas=ciclo_vendas,
+        produto=produtos,
+        segmentos=segmentos,
+        modelo_negocio=modelo_negocio,
+        k=5
     )
-    conhecimento_servicos = buscar_conhecimento_complementado(
-        f"Que serviços agregados são relevantes para empresas que vendem {produtos}, com modelo de negócio baseado em {modelo}?"
+
+
+    servicos_agregados = relacao_servicos_agregados(
+        nome_empresa=empresa,
+        site=site,
+        clientes=clientes,
+        ticket_medio=ticket_medio,
+        ciclo_vendas=ciclo_vendas,
+        produto=produtos,
+        segmentos=segmentos,
+        modelo_negocio=modelo_negocio,
+        dores=dores,
+        beneficios=beneficios,
+        diferenciais=diferenciais,
+        k=10
+    )
+
+    dicas_estrategicas = gerar_dicas_estrategicas(
+        site=site,
+        segmentos=segmentos,
+        clientes=clientes,
+        dores=dores,
+        beneficios=beneficios,
+        diferenciais=diferenciais,
+        produtos=produtos,
+        modelo_negocio=modelo_negocio,
+        ticket_medio=ticket_medio_str,
+        ciclo_vendas=ciclo_vendas,
+        meta_clientes=meta_clientes,
+        modelos_parceria=conhecimento_modelos,
+        perfis_canais=perfis_e_modelos,
+        servicos_agregados=servicos_agregados
     )
 
     # Busca as cidades (RAG + OpenAI para completar 30)
@@ -526,6 +561,7 @@ def gerar_prompt(data):
 
 
     prompt_sem_cidades_html = f'''
+
 🧠 DIAGNÓSTICO ESTRUTURADO – EMPRESA {empresa.upper()}
 
 🔹 Local informado:
@@ -546,6 +582,15 @@ def gerar_prompt(data):
 🔹 Modelo de Negócio:
 {modelo_negocio}
 
+🔹 Modelos de Parceria:
+{conhecimento_modelos}
+
+🔹 Perfis de Empresas Parceiras com FIT:
+{perfis_e_modelos}
+
+🔹 Serviços Agregados:
+{servicos_agregados}
+
 🔹 Necessidades de Prospecção:
 - Meta Prevista: {novos_clientes} novo cliente/mês  
 - Ciclo de Venda: {ciclo} dias  
@@ -554,25 +599,14 @@ def gerar_prompt(data):
 - Índice de Conversão de Oportunidades em Vendas: {int(taxa_vendas * 100)}%  
 - Número de Oportunidades: {oportunidades:,}
 
-🔹 Modelos de Parceria:
-{conhecimento_modelos}
-
-🔹 Perfis de Empresas Parceiras com FIT:
-{conhecimento_perfis}
-
-🔹 Serviços Agregados:
-{conhecimento_servicos}
-
 🔹 Retorno sobre o Investimento:
 Ticket Médio: R${ticket:,.2f}
 Receita Mensal com 20 canais: R${receita_mensal:,.2f}
 Receita estimada em 24 meses: R${receita_24_meses:,.2f}
 
 🔹 Dicas Estratégicas:
-- Inicie com 3 a 5 canais
-- Forneça treinamentos e acompanhamento semanal
-- Crie campanhas e ações de marketing
-- Corrija falhas com feedback dos canais
+
+{dicas_estrategicas}
 
 🔹 Chamada para Ação:
 Sua empresa está pronta para crescer com uma estratégia sólida de canais de vendas.
@@ -580,6 +614,7 @@ Entre em contato com a AC Partners e comece agora o onboarding comercial com esp
 '''
 
     # RETORNE O PROMPT E O HTML DAS CIDADES SEPARADOS!
+
     return prompt_sem_cidades_html, cidades_html
 
 def chamar_llm(prompt):
@@ -630,17 +665,34 @@ def sugerir_cidades_openai(segmentos, total_necessario=30):
         logger.error(f"Erro ao sugerir cidades com OpenAI: {str(e)}")
         return []
 
-def detalhar_empresa_openai(site, nome_empresa):
+def detalhar_empresa_openai(site, nome_empresa, segmentos, clientes, produtos, modelo_negocio):
+    """
+    Gera um diagnóstico detalhado da empresa com base em todas as informações disponíveis.
+    """
     try:
         prompt = (
-            f"Você é um redator técnico. Com base no nome da empresa \"{nome_empresa}\" e no site \"{site}\", "
-            "gere um resumo claro, profissional e objetivo sobre a empresa. "
-            "Destaque o segmento de atuação, diferenciais e áreas atendidas. Use no máximo 3 frases."
+            f"""
+Empresa: {nome_empresa}
+Site: {site}
+Segmentos: {segmentos}
+Clientes atendidos: {clientes}
+Produtos vendidos: {produtos}
+Como é vendido/modelo de negócio: {modelo_negocio}
+
+Com base nesses dados, faça uma análise clara, objetiva e profissional sobre:
+- O que a empresa faz, seu segmento e diferenciais.
+- O potencial da empresa no mercado brasileiro.
+- Como canais de venda podem ganhar dinheiro e crescer numa parceria com essa empresa (exemplifique).
+- Destaque oportunidades, nichos, ou perfis de canal que podem performar melhor.
+- Seja sintético, mas completo. Use no máximo 5 frases.
+"""
         )
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Você é um redator corporativo especializado em empresas B2B."},
+                {"role": "system", "content": (
+                    "Você é um consultor de canais B2B brasileiro, especialista em análise de potencial de empresas e oportunidades de parceria para canais."
+                )},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.4
@@ -648,18 +700,40 @@ def detalhar_empresa_openai(site, nome_empresa):
         return resposta.choices[0].message.content.strip()
     except Exception as e:
         logger.warning(f"Erro ao detalhar empresa: {str(e)}")
-        return f"Para mais informações, visite [{nome_empresa}]({site})."
+        return (
+            f"Para mais informações, visite [{nome_empresa}]({site}). "
+            f"Segmentos: {segmentos}. Clientes: {clientes}. Produtos: {produtos}."
+        )
 
 def detalhar_produto_openai(produto_texto, segmento):
+    """
+    Analisa profundamente o produto/solução, destacando ganhos para clientes nos segmentos informados,
+    e mostra como canais de vendas podem gerar múltiplas receitas com esse produto.
+    """
     try:
         prompt = (
-            f"Explique de forma clara e profissional o seguinte produto ou solução voltado ao segmento {segmento}: \"{produto_texto}\". "
-            "Gere 2 frases destacando utilidade e valor estratégico para empresas B2B."
+            f"""
+Produto/Solução: {produto_texto}
+Segmento(s) de atuação: {segmento}
+
+Com base nessas informações, faça uma análise detalhada e profissional:
+- Explique a importância do produto para empresas dos segmentos informados, considerando desafios e oportunidades do mercado B2B brasileiro.
+- Destaque todos os ganhos estratégicos, operacionais e financeiros que os clientes podem obter ao utilizá-lo.
+- Aponte diferenciais competitivos do produto ou solução para o segmento.
+- Analise como canais de vendas (revendas, consultorias, parceiros, etc.) podem gerar receitas adicionais com esse produto, incluindo modelos de comissão, serviços agregados, cross-sell, upsell, manutenção, suporte, projetos, integrações, treinamento, entre outros.
+- Ofereça exemplos práticos de como um canal pode ampliar seu faturamento com esse produto em empresas desse segmento.
+- Seja claro, objetivo e comercial, com até 5 frases bem desenvolvidas.
+"""
         )
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Você é um especialista em posicionamento de soluções B2B."},
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um consultor de negócios B2B e especialista em geração de receita para canais de vendas no Brasil."
+                    )
+                },
                 {"role": "user", "content": prompt}
             ],
             temperature=0.4
@@ -669,16 +743,31 @@ def detalhar_produto_openai(produto_texto, segmento):
         logger.warning(f"Erro ao detalhar produto: {str(e)}")
         return produto_texto
 
-def detalhar_clientes_openai(clientes_lista):
+def detalhar_clientes_openai(clientes_lista, ticket_medio, segmentos, produtos, modelo_negocio):
+    """
+    Gera um diagnóstico completo do perfil de clientes da empresa, ganhos com o produto e oportunidades de receita para canais.
+    """
     try:
-        prompt = (
-            "Gere um parágrafo curto sobre o perfil dos seguintes clientes atendidos atualmente:\n"
-            f"{clientes_lista}\nMostre diversidade, relevância setorial e valor estratégico."
-        )
+        prompt = f"""
+Empresa com os seguintes dados:
+- Ticket médio: R${ticket_medio}
+- Clientes atuais: {clientes_lista}
+- Segmentos atendidos: {segmentos}
+- Produtos/serviços vendidos: {produtos}
+- Modelo de negócio: {modelo_negocio}
+
+Com base nessas informações:
+1. Analise o perfil dos clientes atuais e trace o perfil de cliente IDEAL para a empresa, considerando potencial de geração de valor e fit com produtos/serviços.
+2. Explique todos os ganhos estratégicos e operacionais que os produtos/serviços podem trazer para esses clientes ideais.
+3. Detalhe os tipos de receita que podem ser geradas para os canais de venda ao atuar com estes clientes e produtos (ex: comissão, implantação, suporte, treinamento, integração, serviços agregados, recorrência, etc).
+4. Seja conciso, prático, comercial e objetivo. Use até 5 frases bem desenvolvidas.
+"""
         resposta = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Você é um analista de portfólio de clientes B2B."},
+                {"role": "system", "content": (
+                    "Você é um consultor sênior de canais B2B com experiência em análise de mercado, perfis de clientes e oportunidades de geração de receita para parceiros."
+                )},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.4
@@ -686,7 +775,7 @@ def detalhar_clientes_openai(clientes_lista):
         return resposta.choices[0].message.content.strip()
     except Exception as e:
         logger.warning(f"Erro ao detalhar clientes: {str(e)}")
-        return clientes_lista
+        return f"Clientes: {clientes_lista}. Ticket médio: R${ticket_medio}. Segmentos: {segmentos}. Produtos: {produtos}."
 
 def consultar_taxas_software_b2b():
     prompt = (
@@ -720,6 +809,227 @@ def consultar_taxas_software_b2b():
     except Exception as e:
         logger.error(f"Erro ao consultar taxas de conversão: {str(e)}")
         return 0.1, 0.2
+
+def buscar_modelos_parceria_empresa(
+    nome_empresa,
+    site,
+    clientes,
+    ticket_medio,
+    ciclo_vendas,
+    produto,
+    segmentos,
+    modelo_negocio,
+    k=5
+):
+    """
+    Busca no RAG e complementa com OpenAI os 5 melhores modelos de parceria para a empresa,
+    detalhando o funcionamento e potencial de retorno de cada modelo.
+    Usa cache para perguntas repetidas.
+    """
+    # Monte a pergunta personalizada e rica
+    pergunta = (
+        f"Considerando os seguintes dados da empresa:\n"
+        f"- Nome: {nome_empresa}\n"
+        f"- Site: {site}\n"
+        f"- Segmentos: {segmentos}\n"
+        f"- Clientes: {clientes}\n"
+        f"- Produtos/Serviços: {produto}\n"
+        f"- Modelo de negócio: {modelo_negocio}\n"
+        f"- Ticket médio: R${ticket_medio}\n"
+        f"- Ciclo médio de vendas: {ciclo_vendas} dias\n\n"
+        f"Quais são os 5 melhores modelos de parceria para este negócio?\n"
+        f"Para cada modelo, explique:\n"
+        f"- Como funciona\n"
+        f"- O que agrega para a empresa\n"
+        f"- Como o parceiro pode obter ganhos (tipos de receita)\n"
+        f"- Perfil ideal de parceiro para cada modelo\n"
+        f"Responda de forma prática, clara e adaptada ao mercado brasileiro de canais."
+    )
+
+    # Cache para evitar repetição de busca
+    cache_key = f"{pergunta}|k={k}"
+    global _resposta_cache
+    if "_resposta_cache" not in globals():
+        _resposta_cache = {}
+    if cache_key in _resposta_cache:
+        return _resposta_cache[cache_key]
+
+    # Busca no RAG (top k)
+    resposta_rag = buscar_conhecimento(pergunta, k)
+
+    # Prompt detalhado para a OpenAI complementar com base no que veio do RAG
+    prompt = (
+        f"Com base no conhecimento extraído a seguir, explique detalhadamente os 5 melhores modelos de parceria para a empresa informada, "
+        f"destacando para cada um: funcionamento, ganhos para a empresa, ganhos para o parceiro (formas de receita), perfil ideal de canal e exemplos práticos.\n\n"
+        f"Pergunta: {pergunta}\n\n"
+        f"Conhecimento extraído do RAG:\n{resposta_rag}\n"
+    )
+    try:
+        resposta_ia = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um consultor de canais de vendas B2B, especialista em modelagem de parcerias e geração de receita para canais no Brasil."
+                    )
+                },
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4,
+            max_tokens=1000
+        )
+        resposta_final = (
+            f"{resposta_rag}\n\n🔎 Complemento da IA:\n{resposta_ia.choices[0].message.content.strip()}"
+        )
+        _resposta_cache[cache_key] = resposta_final
+        return resposta_final
+    except Exception as e:
+        logger.warning(f"Erro ao complementar conhecimento com OpenAI: {e}")
+        _resposta_cache[cache_key] = resposta_rag
+        return resposta_rag
+
+def conhecimento_perfis(
+    nome_empresa,
+    site,
+    clientes,
+    ticket_medio,
+    ciclo_vendas,
+    produto,
+    segmentos,
+    modelo_negocio,
+    k=5
+):
+    """
+    Busca no RAG e complementa com OpenAI os 5 melhores modelos de parceria para a empresa
+    e, para cada modelo, detalha o perfil ideal dos canais de vendas (estrutura, competências, segmento, etc).
+    """
+    pergunta = (
+        f"Considerando os seguintes dados da empresa:\n"
+        f"- Nome: {nome_empresa}\n"
+        f"- Site: {site}\n"
+        f"- Segmentos: {segmentos}\n"
+        f"- Clientes: {clientes}\n"
+        f"- Produtos/Serviços: {produto}\n"
+        f"- Modelo de negócio: {modelo_negocio}\n"
+        f"- Ticket médio: R${ticket_medio}\n"
+        f"- Ciclo médio de vendas: {ciclo_vendas} dias\n\n"
+        f"Quais são os 5 melhores modelos de parceria comercial para este negócio?\n"
+        f"Para cada modelo, explique:\n"
+        f"1. Nome do modelo\n"
+        f"2. Descrição/função\n"
+        f"3. Ganhos para a empresa\n"
+        f"4. Ganhos para o parceiro (formas de receita)\n"
+        f"5. PERFIL IDEAL DE CANAL/EMPRESA PARCEIRA para este modelo (estrutura, porte, competências, segmento, como atua, etc)\n"
+        f"Se possível, dê exemplos práticos. Responda de forma estruturada e adaptada ao mercado brasileiro de canais."
+    )
+
+    # Cache para evitar repetição de busca
+    cache_key = f"{pergunta}|k={k}"
+    global _resposta_cache
+    if "_resposta_cache" not in globals():
+        _resposta_cache = {}
+    if cache_key in _resposta_cache:
+        return _resposta_cache[cache_key]
+
+    resposta_rag = buscar_conhecimento(pergunta, k)
+
+    prompt = (
+        f"Com base no conhecimento extraído a seguir, explique detalhadamente os 5 melhores modelos de parceria para a empresa informada. "
+        f"Para cada modelo, detalhe claramente:\n"
+        f"1. Nome do modelo\n"
+        f"2. Descrição/função\n"
+        f"3. Ganhos para a empresa\n"
+        f"4. Ganhos para o parceiro (formas de receita)\n"
+        f"5. PERFIL IDEAL DE CANAL/EMPRESA PARCEIRA para este modelo (estrutura, porte, competências, segmento, como atua, etc)\n"
+        f"6. Exemplos práticos\n\n"
+        f"Pergunta: {pergunta}\n\n"
+        f"Conhecimento extraído do RAG:\n{resposta_rag}\n"
+    )
+    try:
+        resposta_ia = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um consultor sênior de canais de vendas B2B, especialista em modelagem de parcerias e perfis de canais no Brasil."
+                    )
+                },
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.45,
+            max_tokens=1800
+        )
+        resposta_final = (
+            f"{resposta_rag}\n\n🔎 Complemento da IA:\n{resposta_ia.choices[0].message.content.strip()}"
+        )
+        _resposta_cache[cache_key] = resposta_final
+        return resposta_final
+    except Exception as e:
+        logger.warning(f"Erro ao complementar conhecimento com OpenAI: {e}")
+        _resposta_cache[cache_key] = resposta_rag
+        return resposta_rag
+
+def relacao_servicos_agregados(
+    nome_empresa,
+    site,
+    clientes,
+    ticket_medio,
+    ciclo_vendas,
+    produto,
+    segmentos,
+    modelo_negocio,
+    dores,
+    beneficios,
+    diferenciais,
+    k=10
+):
+    """
+    Gera uma análise dos 10 principais serviços agregados e fontes de receita
+    que os canais de vendas podem oferecer em parceria com a empresa,
+    considerando todas as características e diferenciais do negócio.
+    """
+    prompt = (
+        f"Empresa: {nome_empresa}\n"
+        f"Site: {site}\n"
+        f"Clientes: {clientes}\n"
+        f"Ticket médio: R${ticket_medio}\n"
+        f"Ciclo médio de vendas: {ciclo_vendas} dias\n"
+        f"Produtos/serviços: {produto}\n"
+        f"Segmentos de atuação: {segmentos}\n"
+        f"Modelo de negócio: {modelo_negocio}\n"
+        f"Dores e benefícios para o cliente: {dores} | {beneficios}\n"
+        f"Diferenciais competitivos: {diferenciais}\n\n"
+        f"Com base nessas informações, liste e explique 10 serviços agregados diferentes e fontes de receita "
+        f"que canais de vendas podem gerar e oferecer ao fechar parceria com essa empresa.\n"
+        f"Para cada serviço, explique:\n"
+        f"- O que é o serviço\n"
+        f"- Como ele se conecta às dores e benefícios do cliente\n"
+        f"- Como gera receita extra para o canal/parceiro\n"
+        f"- Se possível, mencione diferenciais e exemplos práticos\n"
+        f"Responda de forma prática, completa, adaptada ao mercado brasileiro e evite repetições."
+    )
+
+    try:
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é um consultor de canais de vendas B2B, especialista em geração de receita e serviços agregados para parceiros no Brasil."
+                    )
+                },
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.45,
+            max_tokens=1800
+        )
+        return resposta.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Erro ao obter serviços agregados: {e}")
+        return "Não foi possível gerar os serviços agregados neste momento."
 
 def buscar_conhecimento_complementado(pergunta: str) -> str:
     """
@@ -763,3 +1073,64 @@ def titulos_html_sem_hash(texto):
     padrao = r"^###\s*([\d]+\. [^\n]+)"
     texto = re.sub(padrao, r"<strong>\1</strong>\n\n", texto, flags=re.MULTILINE)
     return texto
+
+def gerar_dicas_estrategicas(
+    site,
+    segmentos,
+    clientes,
+    dores,
+    beneficios,
+    diferenciais,
+    produtos,
+    modelo_negocio,
+    ticket_medio,
+    ciclo_vendas,
+    meta_clientes,
+    modelos_parceria,
+    perfis_canais,
+    servicos_agregados
+):
+    """
+    Gera dicas estratégicas personalizadas para aceleração de vendas, estruturação de canais e retenção de parceiros,
+    usando todas as respostas do diagnóstico, modelos de parceria, perfis de canais e serviços agregados.
+    """
+    prompt = (
+        f"Empresa com as seguintes características:\n"
+        f"- Site: {site}\n"
+        f"- Segmentos: {segmentos}\n"
+        f"- Clientes: {clientes}\n"
+        f"- Dores enfrentadas: {dores}\n"
+        f"- Benefícios entregues: {beneficios}\n"
+        f"- Diferenciais competitivos: {diferenciais}\n"
+        f"- Produtos/serviços: {produtos}\n"
+        f"- Modelo de negócio: {modelo_negocio}\n"
+        f"- Ticket médio: R${ticket_medio}\n"
+        f"- Ciclo médio de vendas: {ciclo_vendas} dias\n"
+        f"- Meta de novos clientes por mês pelos canais: {meta_clientes}\n\n"
+        f"Modelos de parceria considerados:\n{modelos_parceria}\n\n"
+        f"Perfis de canais de vendas ideais:\n{perfis_canais}\n\n"
+        f"Serviços agregados e fontes de receita possíveis:\n{servicos_agregados}\n\n"
+        "Com base nesse contexto completo, liste 4 dicas estratégicas práticas, criativas e aplicadas ao mercado brasileiro para:\n"
+        "- Acelerar as vendas via canais\n"
+        "- Estruturar canais de vendas\n"
+        "- Aumentar a retenção e engajamento dos parceiros\n"
+        "As dicas devem ser detalhadas, profundas, realistas e voltadas ao contexto B2B. Evite repetir frases comuns, aprofunde de acordo com as informações fornecidas e relacione as dicas com os modelos de parceria, perfis de canais e serviços agregados apresentados."
+    )
+    try:
+        resposta = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um consultor sênior de canais de vendas B2B, especialista em aceleração comercial para empresas brasileiras."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.35
+        )
+        return resposta.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Erro ao gerar dicas estratégicas: {e}")
+        return (
+            "- Inicie com 3 a 5 canais\n"
+            "- Forneça treinamentos e acompanhamento semanal\n"
+            "- Crie campanhas e ações de marketing\n"
+            "- Corrija falhas com feedback dos canais"
+        )

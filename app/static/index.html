@@ -275,28 +275,23 @@ document.getElementById("chat-form").addEventListener("submit", async function (
       carregando.style.display = 'none';
       finalizacao.style.display = 'block';
 
-      // Processa o resumo do diagnóstico
-      const textoCompleto = finalData.resumo;
-      const partes = textoCompleto.split("\n\n");
-
       function markdownToHtml(texto) {
         return texto
           .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
           .replace(/\n/g, "<br>");
-      }
+}
 
-      const resumoDiagnostico = document.getElementById("resumoDiagnostico");
-      resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${markdownToHtml(partes[0])}</div>`;
+// Exibe o diagnóstico (texto principal)
+const resumoDiagnostico = document.getElementById("resumoDiagnostico");
+resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${markdownToHtml(finalData.diagnostico)}</div>`;
 
-      if (partes.length > 1) {
-        cidadesDiv.style.display = 'block';
-        const blocos = partes.slice(1).join("\n\n").split("<table");
-        let parteFormatada = markdownToHtml(blocos[0]);
-        if (blocos.length > 1) {
-          parteFormatada += "<table" + blocos.slice(1).join("<table");
-        }
-        cidadesDiv.innerHTML = `<h4 style="margin-top:30px">Diagnóstico Programa de Canais de Vendas</h4><br>${parteFormatada}`;
-      }
+// Exibe a tabela de cidades SEPARADA
+if (finalData.cidades_html && finalData.cidades_html.length > 0) {
+  cidadesDiv.style.display = 'block';
+  cidadesDiv.innerHTML = `<h4 style="margin-top:30px">Diagnóstico Programa de Canais de Vendas</h4><br>${finalData.cidades_html}`;
+} else {
+  cidadesDiv.style.display = 'none';
+}
 
       return;
     }
