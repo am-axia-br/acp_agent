@@ -5,6 +5,7 @@ import re
 from rapidfuzz import fuzz
 from openai import OpenAI
 import numpy as np
+import os
 
 
 # Equivalências semânticas para segmentos comuns no Brasil (indústria, construção, saúde etc.)
