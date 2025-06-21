@@ -11,3 +11,4 @@ langchain-openai
 faiss-cpu
 nltk
 gunicorn
+rapidfuzz
