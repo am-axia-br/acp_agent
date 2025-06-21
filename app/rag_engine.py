@@ -266,10 +266,16 @@ def extrair_dados_segmentos_cliente_e_canais(
     
     # Normaliza segmentos dos canais
     
+    segmentos_canal = [
+        "tecnologia", "tecnologia da informação", "TI", "informática", "automação",
+        "software", "hardware", "sistemas de informação", "consultoria em TI",
+        "empresa de tecnologia", "empresa de software", "desenvolvimento de sistemas",
+        "infraestrutura de TI"
+    ]
     termos_canais = set()
-    for termo in equivalencias_semanticas_canais.keys():
+    for termo in segmentos_canal:
         termos_canais.update(normalizar_termo_segmento(termo))
-    
+
     # Soma empresas por cidade em todas as abas
 
     for nome_aba, df_original in sheets_dict.items():

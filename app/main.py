@@ -291,18 +291,16 @@ async def gerar_diagnostico():
     Endpoint para gerar o diagnóstico final e enviar por e-mail.
     """
     try:
-        # Agora, gerar_prompt retorna dois valores:
+        # Agora, gerar_prompt retorna dois valores, mas vamos ignorar cidades_html
         prompt_sem_cidades_html, cidades_html = gerar_prompt(data)
         texto_diagnostico = chamar_llm(prompt_sem_cidades_html)
-        diagnostico_final = (
-            texto_diagnostico +
-            "\n\n🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):\n" +
-            cidades_html
-        )
+        
+        # NÃO concatena cidades_html e NÃO adiciona o título das cidades!
+        
+        diagnostico_final = texto_diagnostico + "\n\n" + cidades_html
 
         diagnostico_final_limpo = limpar_tabela_fake(diagnostico_final)
         diagnostico_formatado = titulos_html_sem_hash(diagnostico_final_limpo)
-
 
         enviar_email(data, diagnostico_formatado, copia_para=["alexandre.maia@acp.tec.br"])
         logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
@@ -752,7 +750,7 @@ def buscar_conhecimento_complementado(pergunta: str) -> str:
     
 def limpar_tabela_fake(diagnostico_final):
     # Procure o marcador do bloco real:
-    marcador = "🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):"
+    marcador = " "
     partes = diagnostico_final.split(marcador)
     if len(partes) == 2:
         # Só retorna o texto até o marcador + o marcador + a tabela real depois
