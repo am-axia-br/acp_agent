@@ -295,7 +295,7 @@ async def gerar_diagnostico():
         prompt_sem_cidades_html, cidades_html = gerar_prompt(data)
         texto_diagnostico = chamar_llm(prompt_sem_cidades_html)
         
-        # NÃO concatena cidades_html e NÃO adiciona o título das cidades!
+        # NÃO concatena cidades_html e NÃO adiciona o título!
         
         diagnostico_final = texto_diagnostico + "\n\n" + cidades_html
 
