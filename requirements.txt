@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+openai>=1.0.0
+python-dotenv
+pandas
+openpyxl
+numpy
+langchain
+langchain-community
+langchain-openai
+faiss-cpu
+nltk
+gunicorn
+rapidfuzz

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Agente ACP – Conectar Expande!</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      transition: all 0.2s ease-in-out;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(to bottom, #fdfbfb, #ebedee);
+      padding: 0;
+      margin: 0;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
+
+    .logo {
+      display: block;
+      margin: 20px auto 10px;
+      max-width: 250px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #7b2cbf;
+      margin: 10px 30px 30px;
+      font-size: 20px;
+      line-height: 1.6;
+      white-space: pre-line;
+    }
+
+    #chat-form {
+      text-align: center;
+      margin: 20px auto 10px;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      max-width: 1100px;
+    }
+
+    #mensagem {
+      width: 90%;
+      min-width: 250px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    #mensagem::placeholder {
+      color: #999;
+      font-style: italic;
+    }
+
+    button {
+      background: linear-gradient(90deg, #a638ec, #fc6736);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #resetar {
+      background: #7b2cbf;
+      margin: 10px auto;
+      display: block;
+    }
+
+    #mensagens {
+      display: block; /* Corrigido para sempre mostrar o chat */
+      flex: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      min-height: 300px;
+      max-height: 500px;
+      box-sizing: border-box;
+    }
+
+    #resposta {
+      display: none;
+    }
+
+    .mensagem { margin: 10px 0; }
+    .usuario { font-weight: bold; color: #5e17eb; }
+    .ia { font-style: italic; color: #fc6736; }
+
+    #finalizacao {
+      max-width: 1100px;
+      margin: 20px auto;
+      background: #fff3cd;
+      padding: 20px;
+      border: 1px solid #ffeeba;
+      border-radius: 10px;
+      display: none;
+      white-space: pre-wrap;
+    }
+
+    #carregando {
+      display: none;
+      text-align: center;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+
+    #barra-progresso {
+      width: 80%;
+      height: 12px;
+      margin: 10px auto;
+      background: #ddd;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    #barra {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #7b2cbf, #fc6736);
+      transition: width 0.3s linear;
+    }
+
+    #cidades {
+      max-width: 1100px;
+      margin: 20px auto;
+      background: #e3f2fd;
+      padding: 20px;
+      border: 1px solid #90caf9;
+      border-radius: 10px;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    footer {
+      text-align: center;
+      padding: 10px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    h3, h4 {
+      color: #5e17eb;
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 600px) {
+      h2 {
+        font-size: 16px;
+        margin: 10px 15px 20px;
+      }
+      #mensagem {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <img src="/static/AC%20Partners%20Gradient.png" alt="AC Partners" class="logo">
+
+  <h2>
+    Olá... Eu sou a AcIA, uma IA especialista em Canais de Vendas<br>
+    e vou te ajudar a montar uma estratégia comercial focada em alianças, parcerias e canais de vendas.<br>
+    Vamos começar nossa conversa? Comece me falando de onde você fala...
+  </h2>
+
+  <form id="chat-form">
+    <input type="text" id="mensagem" required>
+    <button type="submit">Enviar</button>
+  </form>
+
+  <button id="resetar" onclick="reiniciarConversa()">🔄 Reiniciar Diagnóstico</button>
+
+  <div id="mensagens"></div>
+  <pre id="resposta"></pre>
+
+  <div id="cidades" style="display: none;"></div>
+
+  <div id="carregando">
+    <p>Analisando as respostas e preparando o seu diagnóstico...</p>
+    <div id="barra-progresso"><div id="barra"></div></div>
+  </div>
+
+  <div id="finalizacao">
+    <h3>Resumo do Diagnóstico</h3>
+    <div id="resumoDiagnostico"></div>
+    <div id="cidades"></div>
+    <p style="margin-top: 20px;">Deseja enviar o diagnóstico para: <strong id="emailFinal"></strong>?</p>
+    <button onclick="enviarEmailFinal()">📤 Enviar Diagnóstico</button>
+  </div>
+
+  <footer>
+    © AC Partners – Conectar Expande!
+  </footer>
+
+<script>
+// Elementos principais
+const mensagens = document.getElementById("mensagens");
+const respostaArea = document.getElementById("resposta");
+const inputMensagem = document.getElementById("mensagem");
+const carregando = document.getElementById("carregando");
+const finalizacao = document.getElementById("finalizacao");
+const cidadesDiv = document.getElementById("cidades");
+
+// Fluxo principal do chat
+document.getElementById("chat-form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  const mensagem = inputMensagem.value.trim();
+  if (!mensagem) return;
+
+  // Adiciona a mensagem do usuário
+  const divUser = document.createElement("div");
+  divUser.className = "mensagem usuario";
+  divUser.textContent = "Você: " + mensagem;
+  mensagens.appendChild(divUser);
+
+  // Faz scroll sempre após mensagem nova
+  mensagens.scrollTop = mensagens.scrollHeight;
+
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mensagem })
+    });
+
+    const data = await response.json();
+
+    // Só mostra o carregando e parte para diagnóstico se for o final do fluxo
+    if (data.loading) {
+      mensagens.style.display = 'none';
+      carregando.style.display = 'block';
+      let progresso = 0;
+      const barra = document.getElementById("barra");
+
+      const intervalo = setInterval(() => {
+        progresso += 1;
+        barra.style.width = progresso + '%';
+        if (progresso >= 100) clearInterval(intervalo);
+      }, 60);
+
+      const respostaFinal = await fetch("/gerar-diagnostico", { method: "POST" });
+      const finalData = await respostaFinal.json();
+      clearInterval(intervalo);
+
+      carregando.style.display = 'none';
+      finalizacao.style.display = 'block';
+
+      // Processa o resumo do diagnóstico
+      const textoCompleto = finalData.resumo;
+      const partes = textoCompleto.split("\n\n");
+
+      function markdownToHtml(texto) {
+        return texto
+          .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\n/g, "<br>");
+      }
+
+      const resumoDiagnostico = document.getElementById("resumoDiagnostico");
+      resumoDiagnostico.innerHTML = `<div style="line-height: 1.7; font-size: 16px;">${markdownToHtml(partes[0])}</div>`;
+
+      if (partes.length > 1) {
+        cidadesDiv.style.display = 'block';
+        const blocos = partes.slice(1).join("\n\n").split("<table");
+        let parteFormatada = markdownToHtml(blocos[0]);
+        if (blocos.length > 1) {
+          parteFormatada += "<table" + blocos.slice(1).join("<table");
+        }
+        cidadesDiv.innerHTML = `<h4 style="margin-top:30px">Diagnóstico Programa de Canais de Vendas</h4><br>${parteFormatada}`;
+      }
+
+      return;
+    }
+
+    // Adiciona a resposta da IA
+    mensagens.style.display = 'block';
+    const divIa = document.createElement("div");
+    divIa.className = "mensagem ia";
+    divIa.textContent = data.pergunta || data.mensagem || JSON.stringify(data);
+    mensagens.appendChild(divIa);
+
+    // Scroll automático sempre após nova resposta
+    mensagens.scrollTop = mensagens.scrollHeight;
+
+    // Para debug
+    respostaArea.textContent = JSON.stringify(data, null, 2);
+  } catch (error) {
+    alert("Erro ao conectar com o servidor.");
+  }
+
+  inputMensagem.value = "";
+  inputMensagem.focus();
+});
+
+// Função para reiniciar o chat
+function reiniciarConversa() {
+  mensagens.innerHTML = "";
+  respostaArea.textContent = "";
+  document.getElementById("chat-form").style.display = 'flex';
+  mensagens.style.display = 'block';
+  document.getElementById("barra").style.width = '0%';
+  cidadesDiv.style.display = 'none';
+  carregando.style.display = 'none';
+  finalizacao.style.display = 'none';
+  fetch("/reset", { method: "POST" }).then(() => console.log("Reset backend concluído."));
+}
+
+// Dummy para enviar email (preencha conforme seu backend)
+function enviarEmailFinal() {
+  alert('Função de enviar email ainda não implementada.');
+}
+</script>
+
+</body>
+</html>
