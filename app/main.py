@@ -298,11 +298,16 @@ async def gerar_diagnostico():
             "\n\n🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):\n" +
             cidades_html
         )
-        enviar_email(data, diagnostico_final, copia_para=["alexandre.maia@acp.tec.br"])
+
+        diagnostico_final_limpo = limpar_tabela_fake(diagnostico_final)
+        diagnostico_formatado = titulos_html_sem_hash(diagnostico_final_limpo)
+
+
+        enviar_email(data, diagnostico_formatado, copia_para=["alexandre.maia@acp.tec.br"])
         logger.info("Diagnostico gerado com sucesso pela LLM e e-mail enviado")
         return {
             "mensagem": "Diagnostico finalizado! Aqui esta nossa analise baseada nas suas respostas:",
-            "resumo": diagnostico_final,
+            "resumo": diagnostico_formatado,
             "email": data["email"]
         }
     except Exception as e:
@@ -743,3 +748,19 @@ def buscar_conhecimento_complementado(pergunta: str) -> str:
     except Exception as e:
         logger.warning(f"Erro ao complementar conhecimento com OpenAI: {str(e)}")
         return buscar_conhecimento(pergunta)
+    
+def limpar_tabela_fake(diagnostico_final):
+    # Procure o marcador do bloco real:
+    marcador = "🔹 Cidades com Potencial (NÃO ALTERAR O BLOCO ABAIXO - HTML TABELA):"
+    partes = diagnostico_final.split(marcador)
+    if len(partes) == 2:
+        # Só retorna o texto até o marcador + o marcador + a tabela real depois
+        texto_antes = partes[0].strip()
+        bloco_real = marcador + partes[1]
+        return f"{texto_antes}\n\n{bloco_real}"
+    return diagnostico_final  # fallback se não encontrar
+
+def titulos_html_sem_hash(texto):
+    padrao = r"^###\s*([\d]+\. [^\n]+)"
+    texto = re.sub(padrao, r"<strong>\1</strong>\n\n", texto, flags=re.MULTILINE)
+    return texto
