@@ -331,8 +331,23 @@ function reiniciarConversa() {
 
 // Dummy para enviar email (preencha conforme seu backend)
 
-function enviarEmailFinal() {
-  <button onclick="enviarEmailFinal()">📤 Enviar Diagnóstico</button>
+async function enviarEmailFinal() {
+  // Pega email e resumos da tela
+  const email = document.getElementById("emailFinal").textContent.trim();
+  const diagnostico = document.getElementById("resumoDiagnostico").innerHTML;
+  const cidades_html = document.getElementById("cidades").innerHTML;
+
+  try {
+    const resp = await fetch("/enviar-email-final", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, diagnostico, cidades_html })
+    });
+    const data = await resp.json();
+    alert(data.mensagem || "E-mail enviado!");
+  } catch (error) {
+    alert("Erro ao enviar e-mail.");
+  }
 }
 </script>
 

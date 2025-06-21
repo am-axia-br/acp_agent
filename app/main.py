@@ -142,6 +142,7 @@ def novo_diagnostico():
     return {
         "nome": None,
         "empresa": None,
+        "origem": None,  
         "whatsapp": None,
         "email": None,
         "diagnostico": [],
